@@ -1,0 +1,1 @@
+export function reminderDates(eventDate, days = [7, 3, 1]) { return days.map((offset) => ({ eventDate, offset, reminderDate: new Date(new Date(eventDate).getTime() - offset * 86400000).toISOString().slice(0, 10) })) }

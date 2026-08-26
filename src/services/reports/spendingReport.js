@@ -1,0 +1,1 @@
+export function spendingByCategory(transactions) { return transactions.reduce((report, transaction) => { report[transaction.category] = (report[transaction.category] || 0) + transaction.amount; return report }, {}) }

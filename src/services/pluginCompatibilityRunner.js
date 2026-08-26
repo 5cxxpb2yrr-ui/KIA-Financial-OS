@@ -1,0 +1,1 @@
+export function validatePlugin(manifest) { const checks = { manifest: Boolean(manifest?.id && manifest?.name), routes: Array.isArray(manifest?.routes), store: Boolean(manifest?.store), runtime: typeof manifest?.setup === 'function', backup: true, restore: true }; return { checks, status: Object.values(checks).every(Boolean) ? 'PASS' : 'FAIL' } }

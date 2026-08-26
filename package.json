@@ -1,0 +1,29 @@
+{
+  "name": "kia-financial-os",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "chart.js": "latest",
+    "dexie": "latest",
+    "pinia": "latest",
+    "vite": "latest",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "latest",
+    "@vue/test-utils": "latest",
+    "autoprefixer": "latest",
+    "jsdom": "latest",
+    "tailwindcss": "latest",
+    "vitest": "latest"
+  }
+}

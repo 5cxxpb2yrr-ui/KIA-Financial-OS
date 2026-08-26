@@ -1,0 +1,1 @@
+export function forecastBalance({ startingBalance, monthlyIncome, monthlyExpenses, months = 6 }) { return Array.from({ length: months }, (_, index) => ({ month: index + 1, balance: startingBalance + (monthlyIncome - monthlyExpenses) * (index + 1) })) }

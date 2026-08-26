@@ -1,0 +1,18 @@
+<script setup>
+import { computed, onMounted } from 'vue'
+import { useFinanceStore } from '../../../stores/finance.js'
+import FinanceChart from '../../../shared/components/FinanceChart.vue'
+
+const finance = useFinanceStore()
+onMounted(() => finance.load())
+const format = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
+const netWorth = computed(() => finance.totalAssets - finance.totalLiabilities)
+</script>
+<template>
+  <section class="page">
+    <div class="page-heading"><div><p class="mono">FINANCIAL COMMAND CENTER</p><h1>Your money, in one view.</h1><p>Everything is current as of today. Your financial picture is looking steady.</p></div><button class="action-btn">+ Add transaction</button></div>
+    <div class="grid kpi-grid"><div class="card kpi"><div class="kpi-top"><span class="mono">CURRENT CASH</span><span class="positive">↗ 4.8%</span></div><div class="kpi-value">{{ format(finance.currentCash) }}</div><span class="kpi-meta">vs. {{ format(8900) }} last month</span></div><div class="card kpi"><div class="kpi-top"><span class="mono">NET WORTH</span><span class="positive">↗ 2.1%</span></div><div class="kpi-value">{{ format(netWorth) }}</div><span class="kpi-meta">Assets less liabilities</span></div><div class="card kpi"><div class="kpi-top"><span class="mono">SAFE TO SPEND</span><span class="pill">ON TRACK</span></div><div class="kpi-value">{{ format(finance.safeToSpend) }}</div><span class="kpi-meta">through September 1</span></div><div class="card kpi"><div class="kpi-top"><span class="mono">SAVINGS RATE</span><span class="positive">↗ 1.4%</span></div><div class="kpi-value">{{ finance.savingsRate }}%</div><span class="kpi-meta">{{ format(finance.monthlySavings) }} saved this month</span></div></div>
+    <div class="grid chart-grid"><div class="card"><div class="card-heading"><div><h2>Net worth trend</h2><p>Your progress over the last six months</p></div><span class="mono">6 MONTHS⌄</span></div><FinanceChart :labels="['MAR','APR','MAY','JUN','JUL','AUG']" :datasets="[{ label:'Net worth', data:[18000,19200,20500,21400,22500,28540], borderColor:'#1d7c4b', backgroundColor:'#d8f4df', fill:true, tension:.35 }]" /></div><div class="card"><div class="card-heading"><div><h2>Monthly cash flow</h2><p>Income vs. spending</p></div><span class="mono">AUG 2026</span></div><FinanceChart type="bar" :labels="['W1','W2','W3','W4']" :datasets="[{ label:'Income', data:[3300,0,3300,0], backgroundColor:'#1d7c4b' }, { label:'Outflow', data:[1200,1450,900,800], backgroundColor:'#e77858' }]" /><div class="legend"><span><i class="dot" style="background:#1d7c4b"></i>Income</span><span><i class="dot" style="background:#e77858"></i>Outflow</span></div></div></div>
+    <div class="grid split-grid"><div class="card"><div class="card-heading"><div><h2>Upcoming bills</h2><p>Next 14 days</p></div><a class="mono" href="#/planning">VIEW ALL →</a></div><div class="list"><div v-for="bill in finance.upcomingBills" :key="bill.name" class="list-row"><div><strong>{{ bill.name }}</strong><small>{{ bill.due }}</small></div><span class="amount">{{ format(bill.amount) }}</span></div></div></div><div class="card"><div class="card-heading"><div><h2>Budget health</h2><p>August overview</p></div><span class="pill">HEALTHY</span></div><div class="list"><div v-for="budget in finance.budgets" :key="budget.name"><div class="row"><strong style="font-size:12px">{{ budget.name }}</strong><span class="mono">{{ budget.used }}%</span></div><div class="progress"><span :style="{ width: budget.used + '%', background: budget.used > 80 ? 'var(--coral)' : 'var(--green)' }"></span></div></div></div></div></div>
+  </section>
+</template>

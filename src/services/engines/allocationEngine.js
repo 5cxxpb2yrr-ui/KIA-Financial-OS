@@ -1,0 +1,1 @@
+export function allocatePaycheck(amount, allocations) { const total = allocations.reduce((sum, item) => sum + item.amount, 0); return { allocations, total, unallocated: Math.max(amount - total, 0) } }

@@ -1,0 +1,3 @@
+import { db, STORE_NAMES } from '../core/database.js'
+export async function exportDatabase() { const data = {}; for (const name of STORE_NAMES) data[name] = await db[name].toArray(); return JSON.stringify({ metadata:{ name:'KIA_FOS_DB', version:1, exportedAt:new Date().toISOString() }, stores:data }, null, 2) }
+export async function restoreDatabase(json) { const backup = typeof json === 'string' ? JSON.parse(json) : json; if (backup?.metadata?.name !== 'KIA_FOS_DB') throw new Error('Invalid KIA Financial OS backup'); for (const [name, rows] of Object.entries(backup.stores || {})) if (STORE_NAMES.includes(name)) { await db[name].clear(); await db[name].bulkAdd(rows) } }

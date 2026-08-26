@@ -1,0 +1,1 @@
+export function recurringOccurrences(startDate, frequency, count = 12) { const step = { Weekly: 7, Biweekly: 14, Monthly: 30, Quarterly: 91, Annual: 365 }[frequency] || 30; return Array.from({ length: count }, (_, index) => new Date(new Date(startDate).getTime() + index * step * 86400000).toISOString().slice(0, 10)) }

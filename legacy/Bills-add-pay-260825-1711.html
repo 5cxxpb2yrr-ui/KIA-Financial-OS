@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Budget Execution Glass Engine</title>
+<style>
+			/* ==========================================================================
+			   LIQUID GLASS DESIGN SYSTEM (ASHES OF PHOENIX PALETTE)
+			   ========================================================================== */
+			:root {
+				--bg: #0b1120; /* Deep Navy */
+				--card: rgba(30, 41, 59, 0.45); /* Slate Dark Glass */
+				--cyan: #00e9e9;
+				--phoenix-orange: #ff6b35; /* Vibrant Orange */
+				--phoenix-red: #e84855; /* Flame Red Accents */
+				--amber: #ff9f0a;
+				--purple: #bf5af2;
+				--success: #32d74b;
+				--text: #f1f5f9;
+				--text-dim: #94a3b8;
+				--border: rgba(255, 255, 255, 0.08);
+				--blur: saturate(180%) blur(20px);
+
+				--radius-md: 12px;
+				--radius-xl: 20px;
+			}
+
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				background-color: var(--bg);
+				color: var(--text);
+				min-height: 100vh;
+				overflow-x: hidden;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			.page-layout {
+				padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem
+					calc(6rem + env(safe-area-inset-bottom, 0px)) 1rem;
+				max-width: 520px;
+				margin: 0 auto;
+			}
+
+			/* Glass Container Elements */
+			.glass-card {
+				background: var(--card);
+				backdrop-filter: var(--blur);
+				-webkit-backdrop-filter: var(--blur);
+				border: 1px solid var(--border);
+				border-radius: var(--radius-xl);
+				padding: 1.25rem;
+				box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+				margin-bottom: 1.25rem;
+			}
+
+			@media (max-width: 430px) {
+				.glass-card {
+					padding: 1rem 0.75rem; /* Maximize mobile presentation real estate */
+				}
+			}
+
+			.glass-card__title {
+				font-size: 1.1rem;
+				font-weight: 700;
+				letter-spacing: -0.2px;
+			}
+
+			.glass-card__label {
+				font-size: 0.75rem;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				color: var(--text-dim);
+				font-weight: 600;
+			}
+
+			/* UI Inputs */
+			.glass-input {
+				width: 100%;
+				height: 44px;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid var(--border);
+				border-radius: var(--radius-md);
+				color: #fff;
+				padding: 0 1rem;
+				font-size: 0.95rem;
+				outline: none;
+			}
+			.glass-input:focus {
+				border-color: var(--phoenix-orange);
+			}
+
+			.glass-btn {
+				background: rgba(255, 255, 255, 0.06);
+				border: 1px solid var(--border);
+				color: #fff;
+				border-radius: var(--radius-md);
+				padding: 0.6rem 1rem;
+				font-size: 0.85rem;
+				font-weight: 600;
+				cursor: pointer;
+				transition: all 0.2s ease;
+			}
+			.glass-btn:active { transform: scale(0.97); }
+			.glass-btn--primary {
+				background: linear-gradient(135deg, rgba(255, 107, 53, 0.25), rgba(232, 72, 85, 0.1));
+				border-color: rgba(255, 107, 53, 0.4);
+				color: var(--phoenix-orange);
+			}
+			.glass-btn--success {
+				background: linear-gradient(135deg, rgba(50, 215, 75, 0.25), rgba(0, 233, 233, 0.1));
+				border-color: rgba(50, 215, 75, 0.4);
+				color: var(--success);
+			}
+			.glass-btn--danger {
+				background: linear-gradient(135deg, rgba(232, 72, 85, 0.25), rgba(255, 107, 53, 0.1));
+				border-color: rgba(232, 72, 85, 0.4);
+				color: var(--phoenix-red);
+			}
+
+			/* Spreadsheet Containment Safe Wrappers */
+			.matrix-overflow-container {
+				width: 100%;
+				overflow-x: auto;
+				-webkit-overflow-scrolling: touch;
+			}
+
+			/* Spreadsheet Style Matrix Tables */
+			.matrix-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.8rem;
+				margin-top: 0.5rem;
+				table-layout: fixed;
+			}
+
+			/* Explicit structural layout definitions to fit portrait view widths perfectly */
+			.matrix-table th, .matrix-table td {
+				padding: 6px 4px;
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				vertical-align: middle;
+				word-wrap: break-word;
+				overflow: hidden;
+			}
+			.matrix-table th {
+				background: rgba(255, 255, 255, 0.03);
+				color: var(--text-dim);
+				font-weight: 600;
+				text-align: left;
+			}
+			.num-col {
+				text-align: right;
+				font-family: monospace;
+				font-size: 0.85rem;
+				white-space: nowrap;
+			}
+			.text-neg { color: var(--phoenix-red) !important; }
+			.text-pos { color: var(--success) !important; }
+			.editable-row { cursor: pointer; }
+			.editable-row:hover { background: rgba(255, 255, 255, 0.04); }
+
+			/* ==========================================================================
+			   DYNAMIC CALENDAR OVERLAY SYSTEM MODAL
+			   ========================================================================== */
+			.nav-trigger-btn {
+				position: fixed;
+				bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+				right: 1.5rem;
+				width: 56px;
+				height: 56px;
+				border-radius: 50%;
+				background: linear-gradient(135deg, var(--phoenix-orange), var(--phoenix-red));
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				box-shadow: 0 8px 24px rgba(255, 107, 53, 0.3);
+				z-index: 4000;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+			}
+			.modal-overlay {
+				position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+				background: rgba(5, 5, 6, 0.75); backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex; align-items: center; justify-content: center; padding: 1rem;
+				z-index: 3000;
+			}
+			.modal-box {
+				width: 100%; max-width: 400px; background: #151b2b;
+				border: 1px solid var(--border); padding: 1.25rem; border-radius: var(--radius-xl);
+				box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+			}
+
+			/* Calendar Matrix Grid Custom Styles */
+			.calendar-grid {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				gap: 4px;
+				margin-top: 0.75rem;
+			}
+			.calendar-weekday {
+				text-align: center;
+				font-size: 0.7rem;
+				font-weight: 700;
+				color: var(--text-dim);
+				padding-bottom: 4px;
+				text-transform: uppercase;
+			}
+			.calendar-cell {
+				aspect-ratio: 1;
+				background: rgba(255, 255, 255, 0.02);
+				border: 1px solid rgba(255, 255, 255, 0.04);
+				border-radius: 8px;
+				padding: 4px;
+				display: flex;
+				flex-direction: column;
+				justify-content: space-between;
+				position: relative;
+				cursor: pointer;
+			}
+			.calendar-cell:hover {
+				background: rgba(255, 255, 255, 0.06);
+			}
+			.calendar-cell.out-of-month {
+				opacity: 0.15;
+				cursor: default;
+				pointer-events: none;
+			}
+			.calendar-cell.in-period-bracket {
+				background: rgba(0, 233, 233, 0.05);
+				border-color: rgba(0, 233, 233, 0.2);
+			}
+			.calendar-cell.in-period-bracket:hover {
+				background: rgba(0, 233, 233, 0.1);
+			}
+			.calendar-cell-num {
+				font-size: 0.75rem;
+				font-weight: 600;
+			}
+			.calendar-cell.in-period-bracket .calendar-cell-num {
+				color: var(--cyan);
+			}
+			.calendar-dots {
+				display: flex;
+				gap: 2px;
+				flex-wrap: wrap;
+				min-height: 6px;
+			}
+			.calendar-dot {
+				width: 5px;
+				height: 5px;
+				border-radius: 50%;
+				background: var(--amber);
+			}
+			.calendar-dot.skipped {
+				background: var(--phoenix-red);
+			}
+
+			.toggle-view-strip {
+				display: flex;
+				background: rgba(255,255,255,0.04);
+				border-radius: var(--radius-md);
+				padding: 3px;
+				margin-bottom: 1rem;
+				border: 1px solid var(--border);
+			}
+			.toggle-view-btn {
+				flex: 1;
+				background: transparent;
+				border: none;
+				color: var(--text-dim);
+				padding: 8px;
+				font-size: 0.85rem;
+				font-weight: 600;
+				border-radius: 999px;
+				cursor: pointer;
+			}
+			.toggle-view-btn.is-active {
+				background: var(--card);
+				color: var(--phoenix-orange);
+				box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+			}
+			@media (max-width: 400px) {
+				.toggle-view-btn { font-size: 0.72rem; padding: 8px 2px; }
+			}
+
+			.status-pill {
+				display: inline-block;
+				font-size: 0.65rem;
+				font-weight: 700;
+				padding: 2px 6px;
+				border-radius: 4px;
+				text-transform: uppercase;
+			}
+			.status-pill.active { background: rgba(0, 233, 233, 0.15); color: var(--cyan); }
+			.status-pill.dormant { background: rgba(255, 255, 255, 0.08); color: var(--text-dim); }
+			.status-pill.skipped { background: rgba(238, 72, 85, 0.15); color: var(--phoenix-red); }
+
+			.frequency-chip {
+				display:inline-flex; align-items:center; gap:4px; padding:3px 7px;
+				border-radius:999px; background:rgba(0,233,233,.08);
+				border:1px solid rgba(0,233,233,.15); color:var(--cyan);
+				font-size:.62rem; font-weight:700; white-space:nowrap;
+			}
+			.form-help { color:var(--text-dim); font-size:.7rem; margin-top:4px; line-height:1.35; }
+
+			.backup-status {
+				font-size: 0.72rem;
+				color: var(--text-dim);
+				margin-top: 0.5rem;
+			}
+			[v-cloak] { display: none !important; }
+		
+/* ACCOUNT / PAYMENT UPGRADE */
+.dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:1.25rem}
+.metric-card{padding:1rem;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.035)}
+.metric-value{font-size:1.25rem;font-weight:800;margin-top:4px}
+.metric-sub{font-size:.68rem;color:var(--text-dim);margin-top:3px}
+.badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:3px 7px;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.badge-bill{background:rgba(255,159,10,.13);color:var(--amber);border:1px solid rgba(255,159,10,.22)}
+.badge-account{background:rgba(232,72,85,.13);color:var(--phoenix-red);border:1px solid rgba(232,72,85,.22)}
+.badge-asset{background:rgba(50,215,75,.13);color:var(--success);border:1px solid rgba(50,215,75,.22)}
+.badge-paid{background:rgba(50,215,75,.13);color:var(--success)}
+.badge-partial{background:rgba(255,159,10,.13);color:var(--amber)}
+.badge-unpaid{background:rgba(232,72,85,.13);color:var(--phoenix-red)}
+.badge-overpaid{background:rgba(191,90,242,.16);color:var(--purple)}
+.badge-charge{background:rgba(255,107,53,.16);color:var(--phoenix-orange)}
+.badge-reversed{background:rgba(148,163,184,.12);color:var(--text-dim)}
+.badge-skipped{background:rgba(232,72,85,.15);color:var(--phoenix-red)}
+.account-icon{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);margin-right:7px}
+.ledger-name{display:flex;align-items:center;min-width:0}.ledger-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.action-row{display:flex;gap:7px;flex-wrap:wrap}
+.account-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:.75rem 0}
+.summary-box{padding:.75rem;background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:12px}
+.progress-track{height:10px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--phoenix-orange),var(--phoenix-red))}
+.chart-box{position:relative;height:240px;margin-top:10px}
+.chart-box canvas{width:100%!important;height:100%!important}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin:.65rem 0}
+.filter-btn{font-size:.68rem;padding:5px 8px}
+.modal-box.wide{max-width:760px;max-height:92vh;overflow:auto}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.form-grid .full{grid-column:1/-1}
+.small-note{font-size:.68rem;color:var(--text-dim);line-height:1.4}
+.overdue{color:var(--phoenix-red);font-weight:700}
+@media(max-width:640px){.dashboard-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.chart-box{height:210px}.modal-box.wide{max-width:100%;padding:1rem}.matrix-table{min-width:610px}.page-layout{max-width:100%}}
+@media(max-width:360px){.dashboard-grid{grid-template-columns:1fr}.account-summary{grid-template-columns:1fr}}
+
+/* DATA TAB ACCORDIONS */
+.accordion-card{padding:0;overflow:hidden}
+.accordion-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:1rem 1.25rem;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;min-height:52px}
+@media(max-width:430px){.accordion-header{padding:.9rem .85rem}}
+.accordion-header:active{background:rgba(255,255,255,.04)}
+.accordion-header-title{display:flex;flex-direction:column;gap:2px}
+.accordion-header-title h3{font-size:1rem;font-weight:700;letter-spacing:-.2px}
+.accordion-header-sub{font-size:.7rem;color:var(--text-dim)}
+.accordion-chevron{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-dim);flex-shrink:0;transition:transform .3s cubic-bezier(.4,0,.2,1),background .2s ease;font-size:.7rem}
+.accordion-chevron.is-open{transform:rotate(180deg);background:rgba(255,107,53,.12);color:var(--phoenix-orange)}
+.accordion-body-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s cubic-bezier(.4,0,.2,1)}
+.accordion-body-wrap.is-open{grid-template-rows:1fr}
+.accordion-body-inner{overflow:hidden}
+.accordion-body{padding:0 1.25rem 1.25rem 1.25rem;border-top:1px solid var(--border)}
+@media(max-width:430px){.accordion-body{padding:0 .85rem .9rem .85rem}}
+.accordion-body-pad-top{padding-top:1rem}
+.data-tab-intro{font-size:.72rem;color:var(--text-dim);margin:0 0 1rem 2px;line-height:1.4}
+
+/* MASTER LEDGER TABLE — NO HORIZONTAL SCROLL / IPHONE 14 PRO OPTIMIZED */
+.ledger-table{table-layout:fixed}
+.ledger-table th{font-size:.62rem;padding:6px 3px}
+.ledger-table td{padding:7px 3px;font-size:.75rem}
+.ledger-name-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;font-weight:600}
+.ledger-row{position:relative;box-shadow:inset 3px 0 0 0 transparent}
+.ledger-row.status-unpaid{background:rgba(232,72,85,.08);box-shadow:inset 3px 0 0 0 var(--phoenix-red)}
+.ledger-row.status-partial{background:rgba(255,159,10,.08);box-shadow:inset 3px 0 0 0 var(--amber)}
+.ledger-row.status-paid{background:rgba(50,215,75,.06);box-shadow:inset 3px 0 0 0 var(--success)}
+.ledger-row.status-overpaid{background:rgba(191,90,242,.08);box-shadow:inset 3px 0 0 0 var(--purple)}
+.ledger-row.status-skipped{background:rgba(148,163,184,.05);box-shadow:inset 3px 0 0 0 var(--text-dim)}
+.ledger-row.status-active{background:rgba(0,233,233,.06);box-shadow:inset 3px 0 0 0 var(--cyan)}
+.ledger-row.status-scheduled{box-shadow:inset 3px 0 0 0 rgba(255,255,255,.1)}
+.due-chip{display:inline-block;font-size:.64rem;font-weight:700;padding:2px 5px;border-radius:5px;white-space:nowrap;letter-spacing:.2px}
+.due-chip.due-overdue{background:rgba(232,72,85,.16);color:var(--phoenix-red)}
+.due-chip.due-soon{background:rgba(255,159,10,.16);color:var(--amber)}
+.due-chip.due-upcoming{background:rgba(0,233,233,.14);color:var(--cyan)}
+.due-chip.due-later{background:rgba(255,255,255,.05);color:var(--text-dim)}
+@media(max-width:430px){.ledger-table th{font-size:.58rem;padding:5px 2px}.ledger-table td{padding:6px 2px;font-size:.71rem}.due-chip{font-size:.6rem;padding:2px 4px}.ledger-table .badge{font-size:.58rem;padding:2px 5px}}
+
+/* PAYCHECK BUDGET ENGINE */
+.paycheck-hero{background:linear-gradient(135deg,rgba(255,107,53,.16),rgba(0,233,233,.08));border:1px solid rgba(255,107,53,.3);text-align:center;padding:1.5rem 1rem}
+.paycheck-hero .safe-amount{font-size:2.1rem;font-weight:800;margin:.35rem 0;letter-spacing:-.5px;color:var(--success)}
+.paycheck-hero.negative .safe-amount{color:var(--phoenix-red)}
+.check-type-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+.check-type-chip.type-a{background:rgba(0,233,233,.14);color:var(--cyan);border:1px solid rgba(0,233,233,.25)}
+.check-type-chip.type-b{background:rgba(191,90,242,.14);color:var(--purple);border:1px solid rgba(191,90,242,.25)}
+.category-row{margin-bottom:14px}
+.category-row-head{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;margin-bottom:4px}
+.category-row-head strong{font-size:.85rem}
+.cat-bar-track{height:9px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
+.cat-bar-fill{height:100%;border-radius:999px;transition:width .3s ease}
+.cat-bar-fill.green{background:var(--success)}
+.cat-bar-fill.amber{background:var(--amber)}
+.cat-bar-fill.red{background:var(--phoenix-red)}
+.cat-bar-fill.purple{background:var(--purple)}
+.cat-meta-row{display:flex;justify-content:space-between;font-size:.66rem;color:var(--text-dim);margin-top:3px}
+.rule-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem;gap:8px}
+.rule-row:last-child{border-bottom:none}
+.template-toggle{display:flex;gap:6px}
+.alloc-budget-input{height:32px!important;padding:0 6px!important;text-align:right;font-size:.78rem!important}
+@media(max-width:430px){.paycheck-hero .safe-amount{font-size:1.7rem}}
+</style>
+</head>
+
+<body>
+<div id="app" class="page-layout" v-cloak>
+  <div class="glass-card" style="display:flex;gap:8px;justify-content:space-between;padding:.75rem">
+    <button class="glass-btn" @click="shiftTimeWindow(-1)">◀ Prev Window</button>
+    <button class="glass-btn" @click="resetTimeWindow" style="font-size:.75rem">Current Window</button>
+    <button class="glass-btn" @click="shiftTimeWindow(1)">Next Window ▶</button>
+  </div>
+
+  <div class="glass-card" style="padding:.8rem 1rem;text-align:center">
+    <span class="glass-card__label" style="display:block;margin-bottom:2px">Active Monitored Evaluation Bracket</span>
+    <strong style="color:var(--cyan)">{{windowDates.startStr}} — {{windowDates.endStr}}</strong>
+  </div>
+
+  <div class="glass-card" style="padding:.65rem;margin-bottom:1rem">
+    <div class="toggle-view-strip" style="margin:0">
+      <button class="toggle-view-btn" :class="{'is-active':viewMode==='sheet'}" @click="viewMode='sheet'">📊 Template</button>
+      <button class="toggle-view-btn" :class="{'is-active':viewMode==='ledger'}" @click="viewMode='ledger'">⚙️ Ledger</button>
+      <button class="toggle-view-btn" :class="{'is-active':viewMode==='accounts'}" @click="viewMode='accounts'">💳 Accounts</button>
+      <button class="toggle-view-btn" :class="{'is-active':viewMode==='paycheck'}" @click="viewMode='paycheck'">💰 Paycheck</button>
+      <button class="toggle-view-btn" :class="{'is-active':viewMode==='data'}" @click="viewMode='data'">📂 Data</button>
+    </div>
+  </div>
+
+  <div v-if="viewMode==='sheet'">
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <h3 class="glass-card__title">Income Structures</h3><button class="glass-btn glass-btn--primary" @click="openIncomeModal(-1)">+ Manage Income</button>
+      </div>
+      <div class="matrix-overflow-container"><table class="matrix-table">
+        <thead><tr><th>Source</th><th class="num-col">Est</th><th class="num-col">Actual</th><th class="num-col">Diff</th></tr></thead>
+        <tbody>
+          <tr v-for="(inc,idx) in incomeDB" :key="'inc-'+idx" class="editable-row" @click="openIncomeModal(idx)">
+            <td style="color:var(--cyan);font-weight:500">{{inc.name}}</td><td class="num-col">{{fmt(inc.est)}}</td><td class="num-col">{{fmt(inc.actual)}}</td><td class="num-col" :class="{'text-neg':inc.actual-inc.est<0,'text-pos':inc.actual-inc.est>0}">{{fmtAccounting(inc.actual-inc.est)}}</td>
+          </tr>
+          <tr style="background:rgba(255,255,255,.04);font-weight:500"><td>Total Combined</td><td class="num-col">{{fmt(totals.incEst)}}</td><td class="num-col">{{fmt(totals.incActual)}}</td><td class="num-col">{{fmtAccounting(totals.incActual-totals.incEst)}}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="glass-card">
+      <h3 class="glass-card__title" style="margin-bottom:.5rem">Calculated Expenses Schedule Workspace</h3>
+      <div class="matrix-overflow-container"><table class="matrix-table">
+        <thead><tr><th>Line Ledger Item</th><th style="text-align:center">Due</th><th class="num-col">Payment</th><th class="num-col">Balance</th></tr></thead>
+        <tbody>
+          <tr style="background:rgba(255,255,255,.03);font-weight:600"><td style="color:var(--text-dim)">Initial Income Starting Pool</td><td>—</td><td>—</td><td class="num-col" style="color:var(--cyan)">{{fmt(totals.incActual)}}</td></tr>
+          <tr v-for="(fixed,i) in structuralFixedDB" :key="'f-'+i"><td>{{fixed.name}}</td><td>—</td><td class="num-col text-neg">{{fmt(fixed.amount)}}</td><td class="num-col">{{fmtAccounting(runningBalances.fixed[i].actual)}}</td></tr>
+          <tr v-for="(item,i) in computedActivePeriodBills" :key="'b-'+item.id">
+            <td><span class="badge" :class="typeBadgeClass(item.type)">{{typeLabel(item.type)}}</span> {{item.name}}</td>
+            <td style="text-align:center;color:var(--amber);font-size:.75rem">{{formatDate(item._dueDate)}}</td>
+            <td class="num-col text-neg">{{fmt(scheduledPayment(item))}}</td>
+            <td class="num-col">{{item.type==='account' ? fmt(item.currentBalance) : item.type==='asset' ? fmt(item.currentBalance) : fmtAccounting(runningBalances.bills[i].actual)}}</td>
+          </tr>
+          <tr style="background:rgba(255,107,53,.1);font-weight:700;border-top:2px solid var(--phoenix-orange)">
+            <td style="color:var(--phoenix-orange)">Net Ending Liquidity</td><td>{{computedActivePeriodBills.length+structuralFixedDB.length}} Items</td><td class="num-col">{{fmt(totals.expTotal)}}</td><td class="num-col" :class="{'text-neg':totals.incActual-totals.expTotal<0}">{{fmtAccounting(totals.incActual-totals.expTotal)}}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="glass-card">
+      <h3 class="glass-card__title">Charts</h3>
+      <div class="chart-box"><canvas ref="balanceHistoryChartCanvas"></canvas></div>
+      <div class="chart-box"><canvas ref="debtDistChartCanvas"></canvas></div>
+      <div class="chart-box"><canvas ref="paymentTrendChartCanvas"></canvas></div>
+    </div>
+  </div>
+
+  <div v-if="viewMode==='ledger'">
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;gap:8px">
+        <h3 class="glass-card__title">Master Schedule Ledger</h3><button class="glass-btn glass-btn--primary" @click="openBillModal(-1)">+ Add Ledger Item</button>
+      </div>
+      <div class="matrix-overflow-container"><table class="matrix-table ledger-table">
+        <thead><tr><th style="width:32%">Name</th><th style="width:15%">Due</th><th class="num-col" style="width:19%">Payment</th><th style="width:19%">Status</th><th style="width:15%">Type</th></tr></thead>
+        <tbody>
+          <tr v-for="(item,idx) in calendarBillsDB" :key="'ledger-'+item.id" class="editable-row ledger-row" :class="'status-'+ledgerStatus(item)" :style="{ opacity: item.skipped ? 0.45 : 1 }" @click="item.type==='bill'?openBillModal(idx):openAccountModal(idx)">
+            <td class="ledger-name-cell">{{item.name}}</td>
+            <td><span class="due-chip" :class="dueUrgencyClass(item)">{{dueIndicator(item)}}</span></td>
+            <td class="num-col">{{item.type==='bill'?fmt(item.paymentAmount):fmt(scheduledPayment(item))}}</td>
+            <td><span class="badge" :class="ledgerStatusClass(item)">{{ledgerStatus(item)}}</span></td>
+            <td><span class="badge" :class="typeBadgeClass(item.type)">{{typeLabel(item.type)}}</span></td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div v-if="viewMode==='accounts'">
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem"><h3 class="glass-card__title">Accounts</h3><button class="glass-btn glass-btn--primary" @click="openAccountModal(-1)">+ Add Account</button></div>
+      <div v-for="item in accountRecords" :key="item.id" class="metric-card" style="margin-bottom:8px;cursor:pointer" @click="openAccountDetails(item.id)">
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <div><span class="badge" :class="typeBadgeClass(item.type)">{{typeLabel(item.type)}}</span><div style="font-weight:800;margin-top:5px">{{item.name}}</div></div>
+          <div class="num-col" style="font-size:1rem">{{fmt(item.currentBalance)}}</div>
+        </div>
+        <div class="small-note">Payment {{fmt(scheduledPayment(item))}} · Due {{frequencyLabel(item)}}</div>
+        <div class="progress-track"><div class="progress-fill" :style="{width:accountProgress(item)+'%'}"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="viewMode==='paycheck'">
+    <div class="glass-card" style="text-align:center">
+      <span class="glass-card__label">Current Paycheck Window</span>
+      <div style="margin:.35rem 0"><strong style="color:var(--cyan)">{{windowDates.startStr}} — {{windowDates.endStr}}</strong></div>
+      <span class="check-type-chip" :class="currentCheckType==='A'?'type-a':'type-b'">Paycheck {{currentCheckType}} · {{currentTemplate.label}}</span>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="metric-card"><div class="glass-card__label">Paycheck Amount</div><div class="metric-value">{{fmt(paycheckConfig.amount)}}</div><div class="metric-sub">{{paycheckConfig.employer}} · biweekly</div></div>
+      <div class="metric-card"><div class="glass-card__label">Budgeted Amount</div><div class="metric-value">{{fmt(budgetedAmount)}}</div><div class="metric-sub">{{currentTemplate.label}} template</div></div>
+      <div class="metric-card"><div class="glass-card__label">Actual Spending</div><div class="metric-value text-neg">{{fmt(actualSpending)}}</div><div class="metric-sub">{{periodTransactions.length}} transaction(s) this window</div></div>
+      <div class="metric-card"><div class="glass-card__label">Remaining Available</div><div class="metric-value" :class="{'text-neg':remainingAvailable<0,'text-pos':remainingAvailable>=0}">{{fmtAccounting(remainingAvailable)}}</div><div class="metric-sub">Paycheck minus spending</div></div>
+    </div>
+
+    <div class="glass-card paycheck-hero" :class="{negative:safeToSpendToday<0}">
+      <span class="glass-card__label">Safe To Spend Today</span>
+      <div class="safe-amount">{{fmtAccounting(safeToSpendToday)}}</div>
+      <div class="small-note">Available cash minus pending bills minus remaining budget commitments</div>
+    </div>
+
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="glass-card__label">Projected Rollover</span><strong :class="{'text-neg':projectedRollover<0,'text-pos':projectedRollover>=0}">{{fmtAccounting(projectedRollover)}}</strong></div>
+      <div class="small-note" style="margin-top:4px">Estimated surplus/deficit carried into the next paycheck period, after remaining bills.</div>
+    </div>
+
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem"><h3 class="glass-card__title">Category Budget Tracking</h3><button class="glass-btn glass-btn--primary" @click="openTxnModal(-1)">+ Log Transaction</button></div>
+      <div v-for="cat in categoryTracking" :key="cat.name" class="category-row">
+        <div class="category-row-head"><strong>{{cat.name}}</strong><span>{{fmt(cat.spent)}} / {{fmt(cat.budget)}}</span></div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" :class="cat.barColor" :style="{width:cat.pctClamped+'%'}"></div></div>
+        <div class="cat-meta-row"><span>{{cat.pct}}% used</span><span :class="{'text-neg':cat.remaining<0}">{{fmtAccounting(cat.remaining)}} remaining</span></div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <h3 class="glass-card__title" style="margin-bottom:.6rem">Paycheck Forecasting</h3>
+      <div class="account-summary">
+        <div class="summary-box"><div class="glass-card__label">Next Paycheck Date</div><strong>{{formatDate(forecast.nextDate)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Days Until Paycheck</div><strong>{{forecast.daysUntil}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Bills Remaining Before Payday</div><strong class="text-neg">{{fmt(forecast.billsRemaining)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Expected Cash Flow</div><strong :class="{'text-neg':forecast.expectedCashFlow<0,'text-pos':forecast.expectedCashFlow>=0}">{{fmtAccounting(forecast.expectedCashFlow)}}</strong></div>
+      </div>
+      <div class="summary-box" style="margin-top:8px"><div class="glass-card__label">Projected Balance At Payday</div><strong :class="{'text-neg':forecast.projectedBalance<0,'text-pos':forecast.projectedBalance>=0}">{{fmtAccounting(forecast.projectedBalance)}}</strong></div>
+    </div>
+
+    <div class="glass-card">
+      <h3 class="glass-card__title" style="margin-bottom:.6rem">Yearly Projection</h3>
+      <div class="account-summary">
+        <div class="summary-box"><div class="glass-card__label">Annual Income Projection</div><strong>{{fmt(yearly.income)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Annual Fixed Expenses</div><strong class="text-neg">{{fmt(yearly.fixed)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Annual Variable Spending</div><strong class="text-neg">{{fmt(yearly.variable)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Projected Savings</div><strong class="text-pos">{{fmt(yearly.savings)}}</strong></div>
+      </div>
+      <div class="summary-box" style="margin-top:8px"><div class="glass-card__label">Potential Savings Opportunity</div><strong class="text-pos">{{fmt(yearly.opportunity)}}</strong></div>
+      <div class="small-note" style="margin-top:6px">Based on {{fmt(paycheckConfig.amount)}} × 26 pay periods against both templates repeated ~13× each.</div>
+    </div>
+
+    <div class="glass-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+        <h3 class="glass-card__title">Paycheck Allocation</h3>
+        <div class="template-toggle">
+          <button class="glass-btn" :class="{'glass-btn--primary':allocationViewType==='A'}" @click="allocationViewType='A'">A</button>
+          <button class="glass-btn" :class="{'glass-btn--primary':allocationViewType==='B'}" @click="allocationViewType='B'">B</button>
+        </div>
+      </div>
+      <div class="small-note" style="margin-bottom:.5rem">Funds distributed into budget buckets when {{paycheckTemplates[allocationViewType].label}} is received. Assigned amounts are editable.</div>
+      <div class="matrix-overflow-container"><table class="matrix-table">
+        <thead><tr><th>Bucket</th><th class="num-col">Assigned</th><th class="num-col">Spent</th></tr></thead>
+        <tbody>
+          <tr v-for="item in allocationRows" :key="item.name">
+            <td>{{item.name}}</td>
+            <td class="num-col"><input type="number" step=".01" class="glass-input alloc-budget-input" v-model.number="item.ref.budget"></td>
+            <td class="num-col" :class="{'text-neg':item.spent>item.ref.budget}">{{fmt(item.spent)}}</td>
+          </tr>
+          <tr style="font-weight:700;background:rgba(255,255,255,.04)"><td>Total</td><td class="num-col">{{fmt(allocationTotals.assigned)}}</td><td class="num-col">{{fmt(allocationTotals.spent)}}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="glass-card accordion-card">
+      <div class="accordion-header" @click="showTransactions=!showTransactions" role="button" :aria-expanded="showTransactions">
+        <div class="accordion-header-title"><h3>Transaction Log</h3><span class="accordion-header-sub">{{transactions.length}} recorded</span></div>
+        <span class="accordion-chevron" :class="{'is-open':showTransactions}">▼</span>
+      </div>
+      <div class="accordion-body-wrap" :class="{'is-open':showTransactions}">
+        <div class="accordion-body-inner"><div class="accordion-body accordion-body-pad-top">
+          <div class="matrix-overflow-container"><table class="matrix-table">
+            <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th class="num-col">Amount</th></tr></thead>
+            <tbody>
+              <tr v-for="t in sortedTransactions" :key="t.id" class="editable-row" @click="openTxnModal(transactions.indexOf(t))">
+                <td>{{formatDate(parseDate(t.date))}}</td><td>{{t.merchant}}</td><td>{{t.category}}</td><td class="num-col text-neg">{{fmt(t.amount)}}</td>
+              </tr>
+              <tr v-if="!transactions.length"><td colspan="4" style="text-align:center;color:var(--text-dim);padding:1rem">No transactions logged yet.</td></tr>
+            </tbody>
+          </table></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="glass-card accordion-card">
+      <div class="accordion-header" @click="showRules=!showRules" role="button" :aria-expanded="showRules">
+        <div class="accordion-header-title"><h3>Auto-Categorization Rules</h3><span class="accordion-header-sub">{{Object.keys(categorizationRules).length}} rules configured</span></div>
+        <span class="accordion-chevron" :class="{'is-open':showRules}">▼</span>
+      </div>
+      <div class="accordion-body-wrap" :class="{'is-open':showRules}">
+        <div class="accordion-body-inner"><div class="accordion-body accordion-body-pad-top">
+          <div class="rule-row" v-for="k in Object.keys(categorizationRules)" :key="k">
+            <span>{{k}} → {{categorizationRules[k]}}</span>
+            <button class="glass-btn glass-btn--danger" style="font-size:.65rem;padding:4px 6px;flex-shrink:0" @click="deleteRule(k)">✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:.75rem">
+            <input class="glass-input" placeholder="Merchant keyword" v-model="ruleForm.merchant">
+            <input class="glass-input" placeholder="Category" v-model="ruleForm.category">
+            <button class="glass-btn glass-btn--primary" @click="addRule">+ Add</button>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="activeTxnIdx!==null" class="modal-overlay" @click="activeTxnIdx=null">
+    <div class="modal-box" @click.stop>
+      <h3 class="glass-card__title" style="margin-bottom:1rem">{{activeTxnIdx===-1?'Log Transaction':'Edit Transaction'}}</h3>
+      <label class="glass-card__label">Date</label><input type="date" class="glass-input" v-model="txnForm.date" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Merchant</label><input class="glass-input" v-model="txnForm.merchant" @input="suggestCategory" placeholder="e.g. Publix, Kroger, Chick-fil-A" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Category</label><input class="glass-input" v-model="txnForm.category" placeholder="Auto-filled from rules, or type your own" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Amount ($)</label><input type="number" step=".01" class="glass-input" v-model.number="txnForm.amount" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between"><button v-if="activeTxnIdx>-1" class="glass-btn" @click="deleteTxn">Delete</button><div class="action-row" style="margin-left:auto"><button class="glass-btn" @click="activeTxnIdx=null">Cancel</button><button class="glass-btn glass-btn--primary" @click="saveTxn">Save</button></div></div>
+    </div>
+  </div>
+
+  <div v-if="viewMode==='data'">
+    <p class="data-tab-intro">Dashboard metrics, debt progress, and backup tools — tap a section to expand it.</p>
+
+    <div class="glass-card accordion-card">
+      <div class="accordion-header" @click="showSummary=!showSummary" role="button" :aria-expanded="showSummary">
+        <div class="accordion-header-title">
+          <h3>Financial Summary</h3>
+          <span class="accordion-header-sub">Net worth, debt &amp; monthly payments</span>
+        </div>
+        <span class="accordion-chevron" :class="{'is-open':showSummary}">▼</span>
+      </div>
+      <div class="accordion-body-wrap" :class="{'is-open':showSummary}">
+        <div class="accordion-body-inner">
+          <div class="accordion-body accordion-body-pad-top">
+            <div class="dashboard-grid" style="margin-bottom:0">
+              <div class="metric-card"><div class="glass-card__label">Total Debt</div><div class="metric-value text-neg">{{fmt(dashboard.totalDebt)}}</div><div class="metric-sub">All debt accounts</div></div>
+              <div class="metric-card"><div class="glass-card__label">Total Assets</div><div class="metric-value text-pos">{{fmt(dashboard.totalAssets)}}</div><div class="metric-sub">All asset accounts</div></div>
+              <div class="metric-card"><div class="glass-card__label">Net Worth</div><div class="metric-value">{{fmt(dashboard.netWorth)}}</div><div class="metric-sub">Assets minus debt</div></div>
+              <div class="metric-card"><div class="glass-card__label">Monthly Payments</div><div class="metric-value">{{fmt(dashboard.monthlyPayments)}}</div><div class="metric-sub">Scheduled account payments</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card accordion-card">
+      <div class="accordion-header" @click="showDebtReduction=!showDebtReduction" role="button" :aria-expanded="showDebtReduction">
+        <div class="accordion-header-title">
+          <h3>Debt Reduction</h3>
+          <span class="accordion-header-sub">Starting debt vs current debt</span>
+        </div>
+        <span class="accordion-chevron" :class="{'is-open':showDebtReduction}">▼</span>
+      </div>
+      <div class="accordion-body-wrap" :class="{'is-open':showDebtReduction}">
+        <div class="accordion-body-inner">
+          <div class="accordion-body accordion-body-pad-top">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div class="small-note">Progress toward $0 balance</div>
+              <strong class="text-pos">{{fmt(dashboard.debtReduction)}}</strong>
+            </div>
+            <div class="progress-track"><div class="progress-fill" :style="{width:dashboard.debtReductionPct+'%'}"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--text-dim)"><span>Starting {{fmt(dashboard.startingDebt)}}</span><span>Current {{fmt(dashboard.totalDebt)}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card accordion-card">
+      <div class="accordion-header" @click="showBudgetData=!showBudgetData" role="button" :aria-expanded="showBudgetData">
+        <div class="accordion-header-title">
+          <h3>Budget Data</h3>
+          <span class="accordion-header-sub">Auto-saved locally <span v-if="lastSavedAt">• {{lastSavedAt}}</span></span>
+        </div>
+        <span class="accordion-chevron" :class="{'is-open':showBudgetData}">▼</span>
+      </div>
+      <div class="accordion-body-wrap" :class="{'is-open':showBudgetData}">
+        <div class="accordion-body-inner">
+          <div class="accordion-body accordion-body-pad-top">
+            <div class="action-row">
+              <button class="glass-btn" @click="exportData">⬇ Export Backup</button>
+              <button class="glass-btn" @click="exportPaymentHistory()">⬇ Payment CSV</button>
+              <button class="glass-btn" @click="$refs.importFile.click()">⬆ Import Backup</button>
+              <input ref="importFile" type="file" accept=".json,application/json" style="display:none" @change="importData">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-trigger-btn" @click="isCalendarModalOpen=true" title="Calendar">📅</div>
+
+  <div v-if="isCalendarModalOpen" class="modal-overlay" @click="isCalendarModalOpen=false">
+    <div class="modal-box" @click.stop style="max-width:440px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3 class="glass-card__title" style="color:var(--phoenix-orange)">{{calendarTitleMonth}}</h3><span class="glass-card__label">Calendar</span></div>
+      <div class="calendar-grid"><div class="calendar-weekday" v-for="d in ['S','M','T','W','T','F','S']">{{d}}</div>
+        <div v-for="(cell,i) in computedCalendarCells" :key="'cell-'+i" class="calendar-cell" :class="{'out-of-month':!cell.inMonth,'in-period-bracket':cell.inPeriod}" @click="cell.inMonth?selectCalendarDay(cell):null">
+          <div class="calendar-cell-num">{{cell.dateNum}}</div><div class="calendar-dots"><div v-for="b in cell.bills" class="calendar-dot" :class="{skipped:b.skipped}"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem"><button class="glass-btn" @click="isCalendarModalOpen=false">Dismiss</button></div>
+    </div>
+  </div>
+
+  <div v-if="selectedDayDetails" class="modal-overlay" style="z-index:5000" @click="selectedDayDetails=null">
+    <div class="modal-box" @click.stop style="max-width:380px;border-color:var(--cyan)">
+      <span class="glass-card__label" style="color:var(--cyan)">Schedule Breakdown</span><h3 class="glass-card__title">{{selectedDayDetails.formattedDate}}</h3>
+      <table class="matrix-table"><thead><tr><th>Item</th><th class="num-col">Payment</th></tr></thead><tbody>
+        <tr v-for="b in selectedDayDetails.bills" :key="b.id"><td><span class="badge" :class="typeBadgeClass(b.type)">{{typeLabel(b.type)}}</span> {{b.name}}</td><td class="num-col text-neg">{{fmt(scheduledPayment(b))}}</td></tr>
+      </tbody></table>
+      <button class="glass-btn" style="float:right;margin-top:1rem" @click="selectedDayDetails=null">Back</button>
+    </div>
+  </div>
+
+  <div v-if="activeIncomeIdx!==null" class="modal-overlay" @click="activeIncomeIdx=null">
+    <div class="modal-box" @click.stop>
+      <h3 class="glass-card__title" style="margin-bottom:1rem">{{activeIncomeIdx===-1?'Add Income Stream':'Modify Income Stream'}}</h3>
+      <label class="glass-card__label">Item Name</label><input class="glass-input" v-model="incomeForm.name" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Estimated Base ($)</label><input type="number" step=".01" class="glass-input" v-model.number="incomeForm.est" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Actual Received ($)</label><input type="number" step=".01" class="glass-input" v-model.number="incomeForm.actual" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between"><button v-if="activeIncomeIdx>-1" class="glass-btn" @click="deleteIncome">Delete</button><div class="action-row" style="margin-left:auto"><button class="glass-btn" @click="activeIncomeIdx=null">Cancel</button><button class="glass-btn glass-btn--primary" @click="saveIncome">Save</button></div></div>
+    </div>
+  </div>
+
+  <div v-if="activeBillIdx!==null" class="modal-overlay" @click="activeBillIdx=null">
+    <div class="modal-box" :class="{wide:billForm.type!=='bill'}" @click.stop>
+      <h3 class="glass-card__title" style="margin-bottom:1rem">{{activeBillIdx===-1?'Add Ledger Item':'Modify Ledger Item'}}</h3>
+      <div v-if="activeBillIdx>-1&&billForm.type!=='bill'" class="summary-box" style="margin-bottom:.85rem"><div class="glass-card__label">Current Balance</div><strong style="font-size:1.1rem">{{fmt(billForm.currentBalance)}}</strong></div>
+      <div class="form-grid">
+        <div class="full"><label class="glass-card__label">Item Name</label><input class="glass-input" v-model="billForm.name"></div>
+        <div><label class="glass-card__label">Type</label><select class="glass-input" v-model="billForm.type"><option value="bill">Bill</option><option value="account">Debt Account</option><option value="asset">Asset Account</option></select></div>
+        <div><label class="glass-card__label">Frequency</label><select class="glass-input" v-model="billForm.frequency"><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="custom">Custom</option></select></div>
+        <div><label class="glass-card__label">Payment Amount</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.paymentAmount"></div>
+        <div v-if="billForm.frequency==='monthly'"><label class="glass-card__label">Due Day</label><input type="number" min="1" max="31" class="glass-input" v-model.number="billForm.day"></div>
+        <div v-if="billForm.frequency!=='monthly'"><label class="glass-card__label">First Due Date</label><input type="date" class="glass-input" v-model="billForm.startDate"></div>
+        <div v-if="billForm.frequency==='custom'" class="full"><label class="glass-card__label">Custom Interval</label><div style="display:grid;grid-template-columns:1fr 1.5fr;gap:8px"><input type="number" min="1" class="glass-input" v-model.number="billForm.interval"><select class="glass-input" v-model="billForm.intervalUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option></select></div></div>
+        <template v-if="billForm.type!=='bill'">
+          <div><label class="glass-card__label">Minimum Payment</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.minimumPayment"></div>
+          <div><label class="glass-card__label">Starting Balance</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.startingBalance"></div>
+          <div><label class="glass-card__label">Current Balance</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.currentBalance"></div>
+          <div v-if="billForm.type==='account'"><label class="glass-card__label">Credit Limit</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.creditLimit"></div>
+          <div v-if="billForm.type==='account'"><label class="glass-card__label">APR %</label><input type="number" step=".001" class="glass-input" v-model.number="billForm.apr"></div>
+          <div><label class="glass-card__label">Account Number</label><input class="glass-input" v-model="billForm.accountNumber"></div>
+          <div><label class="glass-card__label">Last Payment Date</label><input type="date" class="glass-input" v-model="billForm.lastPaymentDate"></div>
+          <div><label class="glass-card__label">Last Payment Amount</label><input type="number" step=".01" class="glass-input" v-model.number="billForm.lastPaymentAmount"></div>
+          <div v-if="billForm.type==='account'" class="full"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" v-model="billForm.autoRevertToBill"> <span class="glass-card__label" style="text-transform:none">Auto-revert to Bill when balance reaches $0</span></label></div>
+        </template>
+        <div class="full"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" v-model="billForm.skipped"> <span class="glass-card__label" style="text-transform:none">Skip this item</span></label></div>
+      </div>
+      <div v-if="billForm.type!=='bill'" class="small-note" style="margin-top:.75rem">For debt accounts, payments reduce the balance by principal. For asset accounts, payments add to the tracked asset value. Converting a bill to an account moves it into the Accounts tab and enables payment history tracking.</div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem"><button v-if="activeBillIdx>-1" class="glass-btn" @click="deleteBill">Delete</button><div class="action-row" style="margin-left:auto">
+        <button v-if="activeBillIdx>-1" class="glass-btn glass-btn--danger" @click="openChargeModal(billForm.id)">➕ Record Charge</button>
+        <button class="glass-btn" @click="activeBillIdx=null">Cancel</button><button class="glass-btn glass-btn--primary" @click="saveBill">Save</button></div></div>
+    </div>
+  </div>
+
+  <div v-if="activeAccountIdx!==null" class="modal-overlay" @click="activeAccountIdx=null">
+    <div class="modal-box wide" @click.stop>
+      <h3 class="glass-card__title" style="margin-bottom:1rem">{{activeAccountIdx===-1?'Add Account':'Modify Account'}}</h3>
+      <div class="form-grid">
+        <div class="full"><label class="glass-card__label">Account Name</label><input class="glass-input" v-model="accountForm.name"></div>
+        <div><label class="glass-card__label">Type</label><select class="glass-input" v-model="accountForm.type"><option value="account">Debt Account</option><option value="asset">Asset Account</option><option value="bill">Bill</option></select></div>
+        <div><label class="glass-card__label">Frequency</label><select class="glass-input" v-model="accountForm.frequency"><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="custom">Custom</option></select></div>
+        <div v-if="accountForm.frequency==='monthly'"><label class="glass-card__label">Due Day</label><input type="number" min="1" max="31" class="glass-input" v-model.number="accountForm.day"></div>
+        <div v-if="accountForm.frequency!=='monthly'"><label class="glass-card__label">First Due Date</label><input type="date" class="glass-input" v-model="accountForm.startDate"></div>
+        <div v-if="accountForm.frequency==='custom'"><label class="glass-card__label">Custom Interval</label><input type="number" min="1" class="glass-input" v-model.number="accountForm.interval"></div>
+        <div v-if="accountForm.frequency==='custom'"><label class="glass-card__label">Custom Unit</label><select class="glass-input" v-model="accountForm.intervalUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option></select></div>
+        <div><label class="glass-card__label">Regular Payment</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.paymentAmount"></div>
+        <div><label class="glass-card__label">Minimum Payment</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.minimumPayment"></div>
+        <div><label class="glass-card__label">Starting Balance</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.startingBalance"></div>
+        <div><label class="glass-card__label">Current Balance</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.currentBalance"></div>
+        <div v-if="accountForm.type==='account'"><label class="glass-card__label">Credit Limit</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.creditLimit"></div>
+        <div v-if="accountForm.type==='account'"><label class="glass-card__label">APR %</label><input type="number" step=".001" class="glass-input" v-model.number="accountForm.apr"></div>
+        <div><label class="glass-card__label">Account Number</label><input class="glass-input" v-model="accountForm.accountNumber"></div>
+        <div><label class="glass-card__label">Last Payment Date</label><input type="date" class="glass-input" v-model="accountForm.lastPaymentDate"></div>
+        <div><label class="glass-card__label">Last Payment Amount</label><input type="number" step=".01" class="glass-input" v-model.number="accountForm.lastPaymentAmount"></div>
+        <div v-if="accountForm.type==='account'" class="full"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" v-model="accountForm.autoRevertToBill"> <span class="glass-card__label" style="text-transform:none">Auto-revert to Bill when balance reaches $0 (for bills that occasionally carry an invoice balance)</span></label></div>
+      </div>
+      <div class="small-note" style="margin-top:.75rem">For debt accounts, payments reduce the balance by principal. For asset accounts, payments add to the tracked asset value.</div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem"><button v-if="activeAccountIdx>-1" class="glass-btn" @click="deleteAccount">Delete</button><div class="action-row" style="margin-left:auto"><button class="glass-btn" @click="activeAccountIdx=null">Cancel</button><button class="glass-btn glass-btn--primary" @click="saveAccount">Save</button></div></div>
+    </div>
+  </div>
+
+  <div v-if="detailAccountId" class="modal-overlay" style="z-index:6000" @click="detailAccountId=null">
+    <div class="modal-box wide" @click.stop>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><span class="badge" :class="typeBadgeClass(detailAccount)">{{typeLabel(detailAccount.type)}}</span><h3 class="glass-card__title" style="margin-top:5px">{{detailAccount.name}}</h3><div v-if="detailAccount.accountNumber" style="font-size:.75rem;color:var(--text-dim);margin-top:2px">Account: {{detailAccount.accountNumber}}</div></div>
+        <button class="glass-btn" @click="detailAccountId=null">Close</button>
+      </div>
+      <div class="account-summary">
+        <div class="summary-box"><div class="glass-card__label">Current Balance</div><strong>{{fmt(detailAccount.currentBalance)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Starting Balance</div><strong>{{fmt(detailAccount.startingBalance)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">APR</div><strong>{{detailAccount.type==='account'?Number(detailAccount.apr||0).toFixed(2)+'%':'—'}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Minimum Payment</div><strong>{{fmt(detailAccount.minimumPayment)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Regular Payment</div><strong>{{fmt(detailAccount.paymentAmount)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Next Due</div><strong>{{nextDueDate(detailAccount)}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Last Payment</div><strong>{{detailAccount.lastPaymentDate?formatDate(parseDate(detailAccount.lastPaymentDate)):'—'}}</strong></div>
+        <div class="summary-box"><div class="glass-card__label">Last Amount</div><strong>{{fmt(detailAccount.lastPaymentAmount)}}</strong></div>
+      </div>
+      <div class="action-row" style="margin:.5rem 0 1rem"><button class="glass-btn" @click="openAccountModal(findAccountIndex(detailAccount.id))">✏ Edit</button><button class="glass-btn glass-btn--success" @click="openPaymentModal(detailAccount.id)">💵 Record Payment</button><button v-if="detailAccount.type==='account'" class="glass-btn glass-btn--danger" @click="openChargeModal(detailAccount.id)">➕ Record Charge</button><button class="glass-btn" @click="exportPaymentHistory(detailAccount.id)">⬇ Export History</button></div>
+
+      <div class="glass-card" style="margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between"><div><h3 class="glass-card__title">Paydown Progress</h3><div class="small-note">{{detailAccount.type==='asset'?'Value Growth':'Balance Reduction'}}</div></div><strong>{{accountProgress(detailAccount)}}%</strong></div>
+        <div class="progress-track"><div class="progress-fill" :style="{width:accountProgress(detailAccount)+'%'}"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--text-dim)"><span>Starting {{fmt(detailAccount.startingBalance)}}</span><span>{{detailAccount.type==='asset'?'Current':'Paid Down'}} {{fmt(detailAccount.type==='asset'?detailAccount.currentBalance:detailAccount.startingBalance-detailAccount.currentBalance)}}</span></div>
+      </div>
+
+      <div class="glass-card" style="margin-bottom:1rem">
+        <h3 class="glass-card__title">Billing Cycle</h3>
+        <div class="account-summary">
+          <div class="summary-box"><div class="glass-card__label">Amount Due</div><strong>{{fmt(detailCycle.amountDue)}}</strong></div>
+          <div class="summary-box"><div class="glass-card__label">Total Paid</div><strong>{{fmt(detailCycle.totalPaid)}}</strong></div>
+          <div class="summary-box"><div class="glass-card__label">Remaining Due</div><strong>{{fmt(detailCycle.remainingDue)}}</strong></div>
+          <div class="summary-box"><div class="glass-card__label">Percent Complete</div><strong>{{detailCycle.percentComplete}}%</strong></div>
+        </div>
+        <span class="badge" :class="'badge-'+detailCycle.status">{{detailCycle.status}}</span><span v-if="detailCycle.overpaid>0" class="text-pos" style="margin-left:8px">Overpaid by {{fmt(detailCycle.overpaid)}}</span>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><h3 class="glass-card__title">Payment History</h3><div class="filter-row"><button v-for="f in ['30','90','12m','all']" :key="f" class="glass-btn filter-btn" :class="{'glass-btn--primary':historyFilter===f}" @click="historyFilter=f">{{f==='12m'?'12 months':f==='all'?'All':f+' days'}}</button></div></div>
+        <div class="matrix-overflow-container"><table class="matrix-table" style="min-width:720px"><thead><tr><th>Date</th><th class="num-col">Payment</th><th class="num-col">Principal</th><th class="num-col">Interest</th><th class="num-col">Before</th><th class="num-col">After</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead>
+        <tbody><tr v-for="p in detailHistory" :key="p.id" :style="{opacity:p.status==='reversed'?.55:1}">
+          <td>{{formatDate(parseDate(p.paymentDate))}}</td><td class="num-col">{{fmt(p.amount)}}</td><td class="num-col">{{fmt(p.principal)}}</td><td class="num-col">{{fmt(p.interest)}}</td><td class="num-col">{{fmt(p.balanceBefore)}}</td><td class="num-col">{{fmt(p.balanceAfter)}}</td><td><span class="badge" :class="'badge-'+p.status">{{p.status}}</span></td><td>{{p.notes || '—'}}</td>
+          <td><button v-if="p.status!=='reversed'" class="glass-btn glass-btn--danger" style="font-size:.65rem;padding:4px 6px" @click="reversePayment(p.id)">Undo</button></td>
+        </tr><tr v-if="!detailHistory.length"><td colspan="9" style="text-align:center;color:var(--text-dim);padding:1rem">No payment history in this filter.</td></tr></tbody></table></div>
+      </div>
+      <div class="chart-box"><canvas ref="accountHistoryChartCanvas"></canvas></div>
+    </div>
+  </div>
+
+  <div v-if="paymentModalItem!==null" class="modal-overlay" style="z-index:7000" @click="paymentModalItem=null">
+    <div class="modal-box" @click.stop style="max-width:380px">
+      <h3 class="glass-card__title" style="margin-bottom:.25rem;color:var(--success)">Record Payment</h3>
+      <div style="font-size:.85rem;color:var(--cyan);margin-bottom:1rem">{{paymentModalItem.name}} ({{typeLabel(paymentModalItem.type)}})</div>
+      <label class="glass-card__label">Payment Date</label><input type="date" class="glass-input" v-model="paymentForm.date" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Payment Amount ($)</label><input type="number" step=".01" class="glass-input" v-model.number="paymentForm.amount" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Notes / Reference</label><input type="text" class="glass-input" placeholder="e.g. Confirmation #1234" v-model="paymentForm.notes" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:flex-end;gap:6px"><button class="glass-btn" @click="paymentModalItem=null">Cancel</button><button class="glass-btn glass-btn--success" @click="submitPaymentWorkflow">Submit Payment</button></div>
+    </div>
+  </div>
+
+  <div v-if="chargeModalItem!==null" class="modal-overlay" style="z-index:7000" @click="chargeModalItem=null">
+    <div class="modal-box" @click.stop style="max-width:380px">
+      <h3 class="glass-card__title" style="margin-bottom:.25rem;color:var(--phoenix-red)">Record Charge</h3>
+      <div style="font-size:.85rem;color:var(--cyan);margin-bottom:1rem">{{chargeModalItem.name}} ({{typeLabel(chargeModalItem.type)}})</div>
+      <div class="small-note" style="margin-bottom:.8rem">Adds to the balance instead of reducing it — use this for itemized invoices, fees, or other charges. {{chargeModalItem.type==='bill'?'This will convert the item to a Debt Account and enable payment tracking.':''}}</div>
+      <label class="glass-card__label">Charge Date</label><input type="date" class="glass-input" v-model="chargeForm.date" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Charge Amount ($)</label><input type="number" step=".01" class="glass-input" v-model.number="chargeForm.amount" style="margin-bottom:.8rem">
+      <label class="glass-card__label">Notes / Reference</label><input type="text" class="glass-input" placeholder="e.g. Late fee, replacement costumes" v-model="chargeForm.notes" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:flex-end;gap:6px"><button class="glass-btn" @click="chargeModalItem=null">Cancel</button><button class="glass-btn glass-btn--danger" @click="submitChargeWorkflow">Submit Charge</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.7.16/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+"use strict";
+const CALENDAR_ANCHOR=new Date("2026-03-31T00:00:00");
+const STORAGE_KEY="interactive-budget-execution-glass-engine-v3";
+const LEGACY_KEYS=["interactive-budget-execution-glass-engine-v2","interactive-budget-execution-glass-engine","interactive-budget-execution-glass-engine-v1"];
+const UUID=()=> (window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);
+const money=n=>Math.round((Number(n)||0)*100)/100;
+new Vue({
+el:"#app",
+data:{
+ viewMode:"sheet",isCalendarModalOpen:false,lastSavedAt:"",persistenceKey:STORAGE_KEY,selectedDayDetails:null,runtimeOffsetIndex:0,
+ showSummary:true,showDebtReduction:true,showBudgetData:false,
+ activeIncomeIdx:null,activeBillIdx:null,activeAccountIdx:null,detailAccountId:null,historyFilter:"all",charts:{},
+ paymentModalItem:null,paymentForm:{amount:0,date:"",notes:""},
+ chargeModalItem:null,chargeForm:{amount:0,date:"",notes:""},
+ incomeForm:{name:"",est:0,actual:0},
+ billForm:{id:"",type:"bill",name:"",day:1,paymentAmount:0,amount:0,minimumPayment:0,currentBalance:0,startingBalance:0,creditLimit:0,apr:0,accountNumber:"",lastPaymentDate:"",lastPaymentAmount:0,skipped:false,frequency:"monthly",startDate:"2026-04-01",interval:1,intervalUnit:"months"},
+ accountForm:{id:"",type:"account",name:"",day:1,frequency:"monthly",startDate:"2026-04-01",interval:1,intervalUnit:"months",paymentAmount:0,minimumPayment:0,currentBalance:0,startingBalance:0,creditLimit:0,apr:0,accountNumber:"",lastPaymentDate:"",lastPaymentAmount:0,skipped:false,autoRevertToBill:false},
+ incomeDB:[{name:"Kia",est:2900,actual:2900},{name:"Other",est:0,actual:0}],
+ calendarBillsDB:[
+  {id:"acc-1",type:"account",name:"PennyMac Mortgage",day:1,paymentAmount:1785,minimumPayment:1785,currentBalance:286000,startingBalance:300000,apr:6.5,accountNumber:"...4321",frequency:"monthly",skipped:false},
+  {id:"bill-1",type:"bill",name:"Disney+",day:8,paymentAmount:20,amount:20,frequency:"monthly",skipped:false},
+  {id:"asset-1",type:"asset",name:"Emergency Fund",day:1,paymentAmount:500,minimumPayment:0,currentBalance:10000,startingBalance:5000,apr:0,accountNumber:"...9876",frequency:"monthly",skipped:false},
+  {id:"bill-2",type:"bill",name:"LSPA Nathan",day:1,paymentAmount:65,amount:65,skipped:false,frequency:"monthly"},
+  {id:"bill-3",type:"bill",name:"LSPA Lillian",day:1,paymentAmount:32.5,amount:32.5,skipped:false,frequency:"monthly"},
+  {id:"bill-4",type:"bill",name:"City of Lagrange",day:1,paymentAmount:60,amount:60,skipped:false,frequency:"monthly"},
+  {id:"bill-5",type:"bill",name:"AT&T",day:6,paymentAmount:130,amount:130,skipped:false,frequency:"monthly"},
+  {id:"bill-6",type:"bill",name:"Samson House",day:6,paymentAmount:7.99,amount:7.99,skipped:false,frequency:"monthly"},
+  {id:"bill-7",type:"bill",name:"Spectrum",day:7,paymentAmount:80,amount:80,skipped:false,frequency:"monthly"},
+  {id:"bill-8",type:"bill",name:"Apple One",day:9,paymentAmount:37.95,amount:37.95,skipped:false,frequency:"monthly"},
+  {id:"bill-9",type:"bill",name:"NorthWest",day:10,paymentAmount:67,amount:67,skipped:false,frequency:"monthly"},
+  {id:"bill-10",type:"bill",name:"USAA Insurance",day:10,paymentAmount:175,amount:175,skipped:false,frequency:"monthly"},
+  {id:"bill-11",type:"bill",name:"Martin",day:15,paymentAmount:30,amount:30,skipped:false,frequency:"monthly"},
+  {id:"bill-12",type:"bill",name:"Nelnet (Heather)",day:15,paymentAmount:53,amount:53,skipped:false,frequency:"monthly"},
+  {id:"bill-13",type:"bill",name:"Diverse",day:17,paymentAmount:350,amount:350,skipped:false,frequency:"monthly"},
+  {id:"bill-14",type:"bill",name:"HP Ink",day:18,paymentAmount:28,amount:28,skipped:false,frequency:"monthly"}],
+ structuralFixedDB:[{name:"Groceries",amount:600},{name:"Tithes",amount:0},{name:"Tithes",amount:0},{name:"Tithes",amount:0},{name:"Tithes",amount:0},{name:"Gas",amount:140},{name:"Dining Out",amount:100},{name:"USAA Loan",amount:118.38},{name:"USAA Loan",amount:177.40},{name:"Southern Loan",amount:121.19},{name:"USAA Subaru",amount:207}],
+ paymentRegister:[],accountBalances:{},accountMetadata:{},
+
+ /* PAYCHECK BUDGET ENGINE */
+ paycheckConfig:{employer:"Kia Georgia",amount:3300,periodDays:14},
+ paycheckTemplates:{
+  A:{key:"A",label:"Mortgage Check",items:[
+   {name:"Mortgage",budget:1750,kind:"fixed"},
+   {name:"Utilities",budget:50,kind:"fixed"},
+   {name:"Spectrum",budget:70,kind:"fixed"},
+   {name:"Subscriptions",budget:76,kind:"fixed"},
+   {name:"Groceries",budget:350,kind:"variable"},
+   {name:"Gas",budget:150,kind:"variable"},
+   {name:"Medical",budget:250,kind:"variable"},
+   {name:"Emergency Fund",budget:250,kind:"savings"},
+   {name:"Restaurants",budget:0,kind:"variable"}
+  ]},
+  B:{key:"B",label:"Operations Check",items:[
+   {name:"Insurance",budget:180,kind:"fixed"},
+   {name:"AT&T",budget:130,kind:"fixed"},
+   {name:"HP Plan",budget:38,kind:"fixed"},
+   {name:"Exterminator",budget:73,kind:"fixed"},
+   {name:"Affirm",budget:73,kind:"fixed"},
+   {name:"Pets",budget:125,kind:"variable"},
+   {name:"Groceries",budget:400,kind:"variable"},
+   {name:"Gas",budget:200,kind:"variable"},
+   {name:"Medical",budget:300,kind:"variable"},
+   {name:"Shopping",budget:200,kind:"variable"},
+   {name:"Kids/Education",budget:100,kind:"variable"},
+   {name:"Savings",budget:500,kind:"savings"},
+   {name:"Restaurants",budget:0,kind:"variable"}
+  ]}
+ },
+ categorizationRules:{
+  "Publix":"Groceries","Kroger":"Groceries","Instacart":"Groceries",
+  "Chick-fil-A":"Restaurants","Taco Bell":"Restaurants","Wendy's":"Restaurants","McDonald's":"Restaurants",
+  "AT&T":"Phone","Spectrum":"Internet","PennyMac":"Mortgage","Chewy":"Pets",
+  "CVS":"Pharmacy","CarelonRx":"Pharmacy","Amazon Prime":"Subscription","Disney+":"Subscription","Apple":"Subscription"
+ },
+ transactions:[],
+ activeTxnIdx:null,txnForm:{id:"",date:new Date().toISOString().slice(0,10),merchant:"",category:"",amount:0},
+ ruleForm:{merchant:"",category:""},
+ allocationViewType:"A",
+ showTransactions:false,showRules:false
+},
+computed:{
+ windowDates(){let r=new Date();if(this.runtimeOffsetIndex)r.setDate(r.getDate()+this.runtimeOffsetIndex*14);let days=Math.floor((r-CALENDAR_ANCHOR)/86400000),it=Math.floor(days/14),s=new Date(CALENDAR_ANCHOR);s.setDate(s.getDate()+it*14);let e=new Date(s);e.setDate(e.getDate()+13);let f={month:"numeric",day:"numeric",year:"2-digit"};return{startObj:s,endObj:e,startStr:s.toLocaleDateString("en-US",f),endStr:e.toLocaleDateString("en-US",f),periodIndex:it}},
+ accountRecords(){return this.calendarBillsDB.filter(x=>x.type==="account"||x.type==="asset")},
+ debtAccounts(){return this.calendarBillsDB.filter(x=>x.type==="account")},
+ assetAccounts(){return this.calendarBillsDB.filter(x=>x.type==="asset")},
+ detailAccount(){return this.calendarBillsDB.find(x=>x.id===this.detailAccountId)||{}},
+ detailHistory(){if(!this.detailAccountId)return[];let now=this.dayOnly(new Date()),cut=null;if(this.historyFilter==="30"){cut=new Date(now);cut.setDate(cut.getDate()-30)}else if(this.historyFilter==="90"){cut=new Date(now);cut.setDate(cut.getDate()-90)}else if(this.historyFilter==="12m"){cut=new Date(now);cut.setFullYear(cut.getFullYear()-1)}return this.paymentRegister.filter(p=>p.accountId===this.detailAccountId&&p.status!=="reversed"&&(cut?this.parseDate(p.paymentDate)>=cut:true)).sort((a,b)=>new Date(b.paymentDate)-new Date(a.paymentDate))},
+ detailCycle(){let a=this.detailAccount;if(!a||!a.id)return{amountDue:0,totalPaid:0,remainingDue:0,percentComplete:0,status:"unpaid",overpaid:0};let due=this.scheduledPayment(a),ds=this.getBillDueDates(a).find(d=>d>=this.dayOnly(this.windowDates.startObj)&&d<=this.dayOnly(this.windowDates.endObj))||this.getBillDueDates(a)[0],key=ds?this.cycleKey(a,ds):this.cycleKey(a,new Date()),paid=this.paymentRegister.filter(p=>p.accountId===a.id&&p.cycleKey===key&&p.status!=="reversed"&&p.entryType!=="charge").reduce((n,p)=>n+Number(p.amount||0),0),remaining=Math.max(0,due-paid),over=Math.max(0,paid-due),pct=due?Math.min(100,paid/due*100):0,status=paid<=0?"unpaid":over>0?"overpaid":paid+0.005>=due?"paid":"partial";return{amountDue:due,totalPaid:money(paid),remainingDue:money(remaining),percentComplete:Math.round(pct),status,overpaid:money(over)}},
+ dashboard(){let debt=this.debtAccounts.reduce((n,a)=>n+Number(a.currentBalance||0),0),assets=this.assetAccounts.reduce((n,a)=>n+Number(a.currentBalance||0),0),starting=this.debtAccounts.reduce((n,a)=>n+Number(a.startingBalance||0),0),monthly=this.accountRecords.reduce((n,a)=>n+this.monthlyEquivalent(a),0),reduction=Math.max(0,starting-debt);return{totalDebt:money(debt),totalAssets:money(assets),netWorth:money(assets-debt),startingDebt:money(starting),debtReduction:money(reduction),debtReductionPct:starting?Math.min(100,Math.max(0,reduction/starting*100)):0,monthlyPayments:money(monthly)}},
+ computedActivePeriodBills(){return this.calendarBillsDB.filter(b=>!b.skipped&&this.isBillDueInWindow(b)).map(b=>({...b,_dueDate:this.getBillDueDates(b).find(d=>d>=this.dayOnly(this.windowDates.startObj)&&d<=this.dayOnly(this.windowDates.endObj))||this.windowDates.startObj})).sort((a,b)=>a._dueDate-b._dueDate)},
+ calendarTitleMonth(){return this.windowDates.startObj.toLocaleString("en-US",{month:"long",year:"numeric"})},
+ computedCalendarCells(){let base=this.windowDates.startObj,y=base.getFullYear(),m=base.getMonth(),first=new Date(y,m,1),matrix=new Date(y,m,1-first.getDay()),cells=[];for(let i=0;i<35;i++){let d=new Date(matrix);d.setDate(d.getDate()+i);let x=this.dayOnly(d);cells.push({dateObj:d,dateNum:d.getDate(),inMonth:d.getMonth()===m,inPeriod:x>=this.dayOnly(this.windowDates.startObj)&&x<=this.dayOnly(this.windowDates.endObj),bills:this.calendarBillsDB.filter(b=>!b.skipped&&this.isBillDueOnDate(b,d))})}return cells},
+ totals(){let incEst=this.incomeDB.reduce((n,i)=>n+Number(i.est||0),0),incActual=this.incomeDB.reduce((n,i)=>n+Number(i.actual||0),0),exp=this.structuralFixedDB.reduce((n,f)=>n+Number(f.amount||0),0)+this.computedActivePeriodBills.reduce((n,b)=>n+this.scheduledPayment(b),0);return{incEst,incActual,expTotal:money(exp)}},
+ runningBalances(){let c=this.totals.incActual,fixed=[];this.structuralFixedDB.forEach(f=>{c-=Number(f.amount||0);fixed.push({actual:c})});let bills=[];this.computedActivePeriodBills.forEach(b=>{c-=this.scheduledPayment(b);bills.push({actual:c})});return{fixed,bills}},
+
+ /* PAYCHECK BUDGET ENGINE */
+ currentCheckType(){let m=((this.windowDates.periodIndex%2)+2)%2;return m===0?"A":"B"},
+ currentTemplate(){return this.paycheckTemplates[this.currentCheckType]},
+ budgetedAmount(){return money(this.currentTemplate.items.reduce((n,i)=>n+Number(i.budget||0),0))},
+ periodTransactions(){let s=this.dayOnly(this.windowDates.startObj),e=this.dayOnly(this.windowDates.endObj);return this.transactions.filter(t=>{let d=this.parseDate(t.date);return d&&d>=s&&d<=e})},
+ sortedTransactions(){return[...this.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date))},
+ actualSpending(){return money(this.periodTransactions.reduce((n,t)=>n+Number(t.amount||0),0))},
+ remainingAvailable(){return money(this.paycheckConfig.amount-this.actualSpending)},
+ pendingBillsAmount(){return money(this.computedActivePeriodBills.reduce((n,b)=>n+this.cycleRemaining(b),0))},
+ remainingBudgetCommitments(){return money(this.currentTemplate.items.reduce((n,i)=>{let spent=this.periodTransactions.filter(t=>this.normalizeCategory(t.category)===this.normalizeCategory(i.name)).reduce((s,t)=>s+Number(t.amount||0),0);return n+Math.max(0,Number(i.budget||0)-spent)},0))},
+ safeToSpendToday(){return money(this.remainingAvailable-this.pendingBillsAmount-this.remainingBudgetCommitments)},
+ projectedRollover(){return money(this.paycheckConfig.amount-this.actualSpending-this.pendingBillsAmount)},
+ categoryTracking(){
+  let names=["Groceries","Gas","Medical","Pets","Restaurants","Shopping","Kids/Education","Savings"];
+  return names.map(name=>{
+   let item=this.currentTemplate.items.find(i=>this.normalizeCategory(i.name)===this.normalizeCategory(name));
+   let budget=item?Number(item.budget||0):0;
+   let spent=money(this.periodTransactions.filter(t=>this.normalizeCategory(t.category)===this.normalizeCategory(name)).reduce((n,t)=>n+Number(t.amount||0),0));
+   let pct=budget?Math.round(spent/budget*100):(spent>0?100:0);
+   let remaining=money(budget-spent);
+   let barColor=pct>100?"purple":pct>=91?"red":pct>=61?"amber":"green";
+   return{name,budget,spent,pct,pctClamped:Math.min(100,pct),remaining,barColor}
+  })
+ },
+ allocationRows(){
+  let tpl=this.paycheckTemplates[this.allocationViewType];
+  return tpl.items.map(i=>({
+   name:i.name,ref:i,
+   spent:money(this.periodTransactions.filter(t=>this.normalizeCategory(t.category)===this.normalizeCategory(i.name)).reduce((n,t)=>n+Number(t.amount||0),0))
+  }))
+ },
+ allocationTotals(){return{assigned:money(this.allocationRows.reduce((n,i)=>n+Number(i.ref.budget||0),0)),spent:money(this.allocationRows.reduce((n,i)=>n+Number(i.spent||0),0))}},
+ forecast(){
+  let end=this.dayOnly(this.windowDates.endObj),next=new Date(end);next.setDate(next.getDate()+1);
+  let today=this.dayOnly(new Date());
+  let daysUntil=Math.max(0,Math.round((next-today)/86400000));
+  let billsRemaining=this.pendingBillsAmount;
+  let expectedCashFlow=money(this.paycheckConfig.amount-billsRemaining);
+  let projectedBalance=money(this.remainingAvailable-billsRemaining);
+  return{nextDate:next,daysUntil,billsRemaining,expectedCashFlow,projectedBalance}
+ },
+ yearly(){
+  let sumByKind=(tpl,kind)=>tpl.items.filter(i=>i.kind===kind).reduce((n,i)=>n+Number(i.budget||0),0);
+  let fixedPerYear=(sumByKind(this.paycheckTemplates.A,"fixed")+sumByKind(this.paycheckTemplates.B,"fixed"))*13;
+  let variablePerYear=(sumByKind(this.paycheckTemplates.A,"variable")+sumByKind(this.paycheckTemplates.B,"variable"))*13;
+  let savingsPerYear=(sumByKind(this.paycheckTemplates.A,"savings")+sumByKind(this.paycheckTemplates.B,"savings"))*13;
+  let income=this.paycheckConfig.amount*26;
+  let opportunity=money(income-fixedPerYear-variablePerYear-savingsPerYear);
+  return{income:money(income),fixed:money(fixedPerYear),variable:money(variablePerYear),savings:money(savingsPerYear),opportunity}
+ }
+},
+methods:{
+ fmt(v){return"$"+(Number(v)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})},
+ fmtAccounting(n){n=Number(n)||0;return n<0?"($"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+")":this.fmt(n)},
+ typeLabel(t){return t==="account"?"Debt":t==="asset"?"Asset":"Bill"},
+ typeBadgeClass(t){return"badge-"+(t||"bill")},
+ ledgerStatusClass(i){if(i.skipped)return"badge-skipped";if(i.type==="bill")return"badge-paid";return"badge-"+this.cycleStatus(i)},
+ ledgerStatus(i){if(i.skipped)return"skipped";if(i.type==="bill")return this.isBillDueInWindow(i)?"active":"scheduled";return this.cycleStatus(i)},
+ cycleStatus(a){let d=this.scheduledPayment(a),ds=this.getBillDueDates(a).find(x=>x>=this.dayOnly(this.windowDates.startObj)&&x<=this.dayOnly(this.windowDates.endObj));if(!ds)return"unpaid";let key=this.cycleKey(a,ds),p=this.paymentRegister.filter(x=>x.accountId===a.id&&x.cycleKey===key&&x.status!=="reversed"&&x.entryType!=="charge").reduce((n,x)=>n+Number(x.amount||0),0);return p<=0?"unpaid":p>d?"overpaid":p+0.005>=d?"paid":"partial"},
+ scheduledPayment(a){return money(a.paymentAmount!=null?a.paymentAmount:a.amount)},
+ monthlyEquivalent(a){let p=this.scheduledPayment(a),f=a.frequency||"monthly";return f==="weekly"?p*52/12:f==="biweekly"?p*26/12:f==="annual"?p/12:f==="custom"?p*((a.intervalUnit==="weeks"?52:a.intervalUnit==="days"?365:12)/(Number(a.interval)||1))/12:p},
+ accountProgress(a){let s=Number(a.startingBalance||0),c=Number(a.currentBalance||0);if(a.type==="asset")return s?Math.min(100,Math.max(0,c/s*100)):c>0?100:0;return s?Math.min(100,Math.max(0,(s-c)/s*100)):0},
+ shiftTimeWindow(n){this.runtimeOffsetIndex+=n},resetTimeWindow(){this.runtimeOffsetIndex=0},
+ dayOnly(d){let x=new Date(d);x.setHours(0,0,0,0);return x},
+ parseDate(v){if(!v)return null;if(v instanceof Date)return this.dayOnly(v);let p=String(v).slice(0,10).split("-").map(Number);return new Date(p[0],p[1]-1,p[2])},
+ formatDate(d){return d?this.dayOnly(d).toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"}):"—"},
+ getBillStartDate(b){if(b.startDate)return this.dayOnly(this.parseDate(b.startDate));if((b.frequency||"monthly")==="monthly")return new Date(this.windowDates.startObj.getFullYear(),this.windowDates.startObj.getMonth(),Math.min(31,Math.max(1,Number(b.day)||1)));return this.dayOnly(this.windowDates.startObj)},
+ getBillDueDates(b){let start=this.getBillStartDate(b),from=this.dayOnly(this.windowDates.startObj),end=this.dayOnly(this.windowDates.endObj),freq=b.frequency||"monthly",out=[];if(freq==="monthly"){let d=new Date(from.getFullYear(),from.getMonth(),1);while(d<=end){let day=Math.min(31,Math.max(1,Number(b.day)||1)),x=new Date(d.getFullYear(),d.getMonth(),day);if(x>=from&&x<=end)out.push(x);d.setMonth(d.getMonth()+1)}}else if(freq==="annual"){for(let y=from.getFullYear()-1;y<=end.getFullYear()+1;y++){let x=new Date(start);x.setFullYear(y);if(x>=from&&x<=end)out.push(x)}}else{let step=freq==="weekly"?7:freq==="biweekly"?14:(Number(b.interval)||1)*(b.intervalUnit==="weeks"?7:b.intervalUnit==="months"?30:1),d=new Date(start);while(d<from)d.setDate(d.getDate()+step);while(d<=end){if(d>=from)out.push(new Date(d));d.setDate(d.getDate()+step)}}return out},
+ getBillDueDatesForDate(b,date){let target=this.dayOnly(date),f=b.frequency||"monthly";if(f==="monthly")return Number(b.day||1)===target.getDate()?[target]:[];if(f==="annual"){let s=this.getBillStartDate(b);return s.getMonth()===target.getMonth()&&s.getDate()===target.getDate()?[target]:[]}let s=this.getBillStartDate(b),step=f==="weekly"?7:f==="biweekly"?14:(Number(b.interval)||1)*(b.intervalUnit==="weeks"?7:b.intervalUnit==="months"?30:1),diff=Math.round((target-s)/86400000);return diff>=0&&diff%step===0?[target]:[]},
+ isBillDueOnDate(b,d){return this.getBillDueDatesForDate(b,d).some(x=>x.getTime()===this.dayOnly(d).getTime())},
+ isBillDueInWindow(b){return this.getBillDueDates(b).length>0},
+ frequencyLabel(b){let f=b.frequency||"monthly";return f==="weekly"?"Weekly":f==="biweekly"?"Biweekly":f==="monthly"?`Monthly · Day ${b.day||1}`:f==="annual"?"Annual":`Every ${b.interval||1} ${b.intervalUnit||"days"}`},
+ ordinalSuffix(n){n=Number(n)||1;let v=n%100;if(v>=11&&v<=13)return n+"th";switch(n%10){case 1:return n+"st";case 2:return n+"nd";case 3:return n+"rd";default:return n+"th"}},
+ dueIndicator(b){let f=b.frequency||"monthly";if(f==="monthly")return"M-"+this.ordinalSuffix(b.day||1);if(f==="weekly")return"W";if(f==="biweekly")return"BW";if(f==="annual"){let s=this.getBillStartDate(b);return"A-"+(s.getMonth()+1)+"/"+s.getDate()}let unit=b.intervalUnit==="weeks"?"w":b.intervalUnit==="months"?"mo":"d";return(b.interval||1)+unit},
+ nextOccurrenceDate(b){let today=this.dayOnly(new Date()),freq=b.frequency||"monthly",start=this.getBillStartDate(b);if(freq==="monthly"){let day=Math.min(31,Math.max(1,Number(b.day)||1)),d=new Date(today.getFullYear(),today.getMonth(),day);if(d<today)d.setMonth(d.getMonth()+1);return d}if(freq==="annual"){let d=new Date(today.getFullYear(),start.getMonth(),start.getDate());if(d<today)d.setFullYear(d.getFullYear()+1);return d}let step=freq==="weekly"?7:freq==="biweekly"?14:(Number(b.interval)||1)*(b.intervalUnit==="weeks"?7:b.intervalUnit==="months"?30:1),d=new Date(start);while(d<today)d.setDate(d.getDate()+step);return d},
+ dueUrgencyClass(b){if(b.skipped)return"due-later";let days=Math.round((this.nextOccurrenceDate(b)-this.dayOnly(new Date()))/86400000);if(days<0)return"due-overdue";if(days<=3)return"due-soon";if(days<=7)return"due-upcoming";return"due-later"},
+ getCycleDateForPayment(a,date){
+ let t=this.dayOnly(date),f=a.frequency||"monthly",s=this.getBillStartDate(a);
+ if(f==="monthly"){let d=new Date(t.getFullYear(),t.getMonth(),Math.min(31,Number(a.day)||1));if(d>t)d.setMonth(d.getMonth()-1);return d}
+ if(f==="annual"){let d=new Date(t.getFullYear(),s.getMonth(),s.getDate());if(d>t)d.setFullYear(d.getFullYear()-1);return d}
+ let step=f==="weekly"?7:f==="biweekly"?14:(Number(a.interval)||1)*(a.intervalUnit==="weeks"?7:a.intervalUnit==="months"?30:1);
+ let diff=Math.floor((t-s)/86400000);if(diff<0)return s;return new Date(s.getTime()+Math.floor(diff/step)*step*86400000)
+},
+cycleKey(a,d){return a.id+"|"+this.dayOnly(d).toISOString().slice(0,10)},
+ nextDueDate(a){let ds=this.getBillDueDates(a);return ds.length?this.formatDate(ds[0]):"—"},
+ selectCalendarDay(c){this.selectedDayDetails={formattedDate:this.formatDate(c.dateObj),bills:c.bills,inPeriod:c.inPeriod}},
+ findAccountIndex(id){return this.calendarBillsDB.findIndex(x=>x.id===id)},
+ openIncomeModal(i){this.activeIncomeIdx=i;this.incomeForm=i===-1?{name:"",est:0,actual:0}:{...this.incomeDB[i]}},
+ saveIncome(){let r={...this.incomeForm,est:Number(this.incomeForm.est)||0,actual:Number(this.incomeForm.actual)||0};if(this.activeIncomeIdx===-1)this.incomeDB.push(r);else this.$set(this.incomeDB,this.activeIncomeIdx,r);this.activeIncomeIdx=null},
+ deleteIncome(){if(this.activeIncomeIdx>-1)this.incomeDB.splice(this.activeIncomeIdx,1);this.activeIncomeIdx=null},
+ openBillModal(i){this.activeBillIdx=i;this.billForm=i===-1?{id:UUID(),type:"bill",name:"",day:1,paymentAmount:0,amount:0,minimumPayment:0,currentBalance:0,startingBalance:0,creditLimit:0,apr:0,accountNumber:"",lastPaymentDate:"",lastPaymentAmount:0,skipped:false,frequency:"monthly",startDate:"2026-04-01",interval:1,intervalUnit:"months"}:{...this.calendarBillsDB[i],paymentAmount:this.calendarBillsDB[i].paymentAmount!=null?this.calendarBillsDB[i].paymentAmount:this.calendarBillsDB[i].amount}},
+ saveBill(){let type=this.billForm.type||"bill",r={...this.billForm,id:this.billForm.id||UUID(),type,day:Number(this.billForm.day)||1,paymentAmount:Number(this.billForm.paymentAmount)||0,minimumPayment:Number(this.billForm.minimumPayment)||0,currentBalance:Number(this.billForm.currentBalance)||0,startingBalance:Number(this.billForm.startingBalance)||0,creditLimit:Number(this.billForm.creditLimit)||0,apr:Number(this.billForm.apr)||0,lastPaymentAmount:Number(this.billForm.lastPaymentAmount)||0,interval:Number(this.billForm.interval)||1};if(type==="account"||type==="asset"){if(!r.startingBalance&&r.currentBalance)r.startingBalance=r.currentBalance}else{r.amount=r.paymentAmount}if(this.activeBillIdx===-1)this.calendarBillsDB.push(r);else this.$set(this.calendarBillsDB,this.activeBillIdx,r);this.activeBillIdx=null},
+ deleteBill(){if(this.activeBillIdx>-1){let a=this.calendarBillsDB[this.activeBillIdx];if(this.paymentRegister.some(p=>p.accountId===a.id)){alert("This item has payment history and cannot be deleted. Mark it skipped instead to preserve the audit trail.");return}this.calendarBillsDB.splice(this.activeBillIdx,1)}this.activeBillIdx=null},
+ openAccountModal(i){this.activeAccountIdx=i;this.accountForm=i===-1?{id:UUID(),type:"account",name:"",day:1,frequency:"monthly",startDate:"2026-04-01",interval:1,intervalUnit:"months",paymentAmount:0,minimumPayment:0,currentBalance:0,startingBalance:0,creditLimit:0,apr:0,accountNumber:"",lastPaymentDate:"",lastPaymentAmount:0,skipped:false,autoRevertToBill:false}:{...this.calendarBillsDB[i]}},
+ saveAccount(){let type=this.accountForm.type||"account",r={...this.accountForm,id:this.accountForm.id||UUID(),type,day:Number(this.accountForm.day)||1,paymentAmount:Number(this.accountForm.paymentAmount)||0,minimumPayment:Number(this.accountForm.minimumPayment)||0,currentBalance:Number(this.accountForm.currentBalance)||0,startingBalance:Number(this.accountForm.startingBalance)||0,creditLimit:Number(this.accountForm.creditLimit)||0,apr:Number(this.accountForm.apr)||0,lastPaymentAmount:Number(this.accountForm.lastPaymentAmount)||0,interval:Number(this.accountForm.interval)||1,autoRevertToBill:!!this.accountForm.autoRevertToBill};if(type==="bill"){r.amount=r.paymentAmount}if(this.activeAccountIdx===-1)this.calendarBillsDB.push(r);else this.$set(this.calendarBillsDB,this.activeAccountIdx,r);this.activeAccountIdx=null},
+ deleteAccount(){if(this.activeAccountIdx>-1){let a=this.calendarBillsDB[this.activeAccountIdx];if(this.paymentRegister.some(p=>p.accountId===a.id)){alert("This account has payment history and cannot be deleted. Mark it skipped instead to preserve the audit trail.");return}this.calendarBillsDB.splice(this.activeAccountIdx,1)}this.activeAccountIdx=null},
+ openAccountDetails(id){this.detailAccountId=id;this.historyFilter="all";this.$nextTick(()=>this.renderAccountChart())},
+ calculateInterest(a,amount,date){if(a.type!=="account"||!Number(a.apr))return 0;let before=Number(a.currentBalance)||0,days=30;if(a.lastPaymentDate){let d=this.parseDate(a.lastPaymentDate),n=this.dayOnly(date);days=Math.max(0,Math.round((n-d)/86400000))}return money(Math.min(amount,Math.max(0,before*(Number(a.apr)/100)*days/365)))},
+ openPaymentModal(id){
+ let a=this.calendarBillsDB.find(x=>x.id===id);
+ if(!a)return;
+ this.paymentModalItem=a;
+ this.paymentForm={amount:this.scheduledPayment(a),date:new Date().toISOString().slice(0,10),notes:""};
+},
+ submitPaymentWorkflow(){
+ if(!this.paymentModalItem)return;
+ let amount=Number(this.paymentForm.amount);
+ if(isNaN(amount)||amount<=0){alert("Invalid payment amount.");return;}
+ let date=this.parseDate(this.paymentForm.date);
+ if(!date){alert("Invalid payment date.");return;}
+ let notes=this.paymentForm.notes||"";
+ this.recordPayment(this.paymentModalItem.id,amount,date,notes);
+ this.paymentModalItem=null;
+},
+ recordPayment(id,amount,date,notes){
+ let a=this.calendarBillsDB.find(x=>x.id===id);
+ if(!a)return;
+ notes=notes||"";
+ let before=Number(a.currentBalance)||0,interest=this.calculateInterest(a,amount,date),principal=a.type==="account"?money(Math.max(0,Math.min(before,amount-interest))):money(amount),after=a.type==="account"?money(Math.max(0,before-principal)):money(before+principal),due=this.getCycleDateForPayment(a,date),key=this.cycleKey(a,due),prior=this.paymentRegister.filter(p=>p.accountId===id&&p.cycleKey===key&&p.status!=="reversed"&&p.entryType!=="charge").reduce((n,p)=>n+Number(p.amount||0),0),scheduled=this.scheduledPayment(a),total=prior+amount,status=total>scheduled?"overpaid":total+0.005>=scheduled?"paid":"partial";
+ let entry={id:UUID(),accountId:id,paymentDate:date.toISOString().slice(0,10),amount:money(amount),balanceBefore:money(before),balanceAfter:money(after),principal,interest,cycleKey:key,notes,status,entryType:"payment"};
+ this.paymentRegister.push(entry);
+ this.updateCycleStatuses(id,key,scheduled);
+ this.$set(a,"currentBalance",after);this.$set(a,"lastPaymentDate",entry.paymentDate);this.$set(a,"lastPaymentAmount",entry.amount);
+ this.maybeAutoRevertToBill(a);
+ this.saveState();this.$nextTick(()=>{this.renderCharts();this.renderAccountChart()})},
+ openChargeModal(id){
+ let a=this.calendarBillsDB.find(x=>x.id===id);
+ if(!a)return;
+ this.chargeModalItem=a;
+ this.chargeForm={amount:0,date:new Date().toISOString().slice(0,10),notes:""};
+},
+ submitChargeWorkflow(){
+ if(!this.chargeModalItem)return;
+ let amount=Number(this.chargeForm.amount);
+ if(isNaN(amount)||amount<=0){alert("Invalid charge amount.");return;}
+ let date=this.parseDate(this.chargeForm.date);
+ if(!date){alert("Invalid charge date.");return;}
+ let notes=this.chargeForm.notes||"";
+ this.recordCharge(this.chargeModalItem.id,amount,date,notes);
+ this.chargeModalItem=null;
+},
+ recordCharge(id,amount,date,notes){
+ let a=this.calendarBillsDB.find(x=>x.id===id);
+ if(!a)return;
+ notes=notes||"";
+ if(a.type==="bill"){
+ this.$set(a,"startingBalance",Number(a.currentBalance)||0);
+ this.$set(a,"type","account");
+ this.$set(a,"autoRevertToBill",true);
+}
+ let before=Number(a.currentBalance)||0,after=money(before+amount),due=this.getCycleDateForPayment(a,date),key=this.cycleKey(a,due);
+ let entry={id:UUID(),accountId:id,paymentDate:date.toISOString().slice(0,10),amount:money(amount),balanceBefore:money(before),balanceAfter:after,principal:0,interest:0,cycleKey:key,notes,status:"charge",entryType:"charge"};
+ this.paymentRegister.push(entry);
+ this.$set(a,"currentBalance",after);
+ this.saveState();this.$nextTick(()=>{this.renderCharts();this.renderAccountChart()})},
+ maybeAutoRevertToBill(a){
+ if(a.type==="account"&&a.autoRevertToBill&&Number(a.currentBalance)<=0){
+ this.$set(a,"type","bill");
+ this.$set(a,"amount",a.paymentAmount);
+}
+},
+ updateCycleStatuses(accountId,cycleKey,due){
+ let total=this.paymentRegister.filter(x=>x.accountId===accountId&&x.cycleKey===cycleKey&&x.status!=="reversed"&&x.entryType!=="charge").reduce((n,x)=>n+Number(x.amount||0),0);
+ let status=total>due?"overpaid":total+0.005>=due?"paid":total>0?"partial":"unpaid";
+ this.paymentRegister.filter(x=>x.accountId===accountId&&x.cycleKey===cycleKey&&x.status!=="reversed"&&x.entryType!=="charge").forEach(x=>this.$set(x,"status",status));
+},
+reversePayment(paymentId){let p=this.paymentRegister.find(x=>x.id===paymentId);if(!p||p.status==="reversed")return;if(!confirm("Reverse this entry? The audit record will be retained."))return;let a=this.calendarBillsDB.find(x=>x.id===p.accountId);if(!a)return;let later=this.paymentRegister.some(x=>x.accountId===a.id&&x.status!=="reversed"&&x.id!==p.id&&new Date(x.paymentDate)>=new Date(p.paymentDate)&&new Date(x.paymentDate)>new Date(p.paymentDate));if(later&&Number(a.currentBalance)!==Number(p.balanceAfter))return alert("This entry is not the latest balance-changing entry. Reverse later entries first.");this.$set(a,"currentBalance",p.balanceBefore);this.$set(p,"status","reversed");if(p.entryType!=="charge"){let due=this.scheduledPayment(a);this.updateCycleStatuses(a.id,p.cycleKey,due)}this.maybeAutoRevertToBill(a);this.saveState();this.$nextTick(()=>{this.renderCharts();this.renderAccountChart()})},
+ normalizeRecord(b){let type=b.type||"bill",id=b.id||UUID(),paymentAmount=b.paymentAmount!=null?Number(b.paymentAmount):Number(b.amount||0);let r={...b,id,type,name:b.name||"Unnamed",frequency:b.frequency||"monthly",day:Number(b.day)||1,paymentAmount,minimumPayment:Number(b.minimumPayment||0),currentBalance:Number(b.currentBalance||0),startingBalance:Number(b.startingBalance||0),creditLimit:Number(b.creditLimit||0),apr:Number(b.apr||0),accountNumber:b.accountNumber||"",lastPaymentDate:b.lastPaymentDate||"",lastPaymentAmount:Number(b.lastPaymentAmount||0),skipped:!!b.skipped,interval:Number(b.interval||b.customInterval||1),intervalUnit:b.intervalUnit||b.customUnit||"months",autoRevertToBill:!!b.autoRevertToBill};if(type==="account"||type==="asset"){if(!r.startingBalance&&r.currentBalance)r.startingBalance=r.currentBalance}else{r.amount=paymentAmount}return r},
+ migrateV1ToV2(saved){
+ let source=saved||{};
+ return {...source,version:2,calendarBillsDB:Array.isArray(source.calendarBillsDB)?source.calendarBillsDB.map(x=>({...x,frequency:x.frequency||"monthly"})):[]};
+},
+migrateV2ToV3(saved){
+ let source=saved||{};
+ return {...source,version:3,calendarBillsDB:Array.isArray(source.calendarBillsDB)?source.calendarBillsDB.map(x=>this.normalizeRecord(x)):[],paymentRegister:Array.isArray(source.paymentRegister)?source.paymentRegister:[],accountBalances:source.accountBalances||{},accountMetadata:source.accountMetadata||{}};
+},
+migratePayload(saved){
+ let version=Number(saved&&saved.version||1),source=saved||{};
+ if(version<2)source=this.migrateV1ToV2(source);
+ if(Number(source.version||2)<3)source=this.migrateV2ToV3(source);
+ let records=(Array.isArray(source.calendarBillsDB)?source.calendarBillsDB:[]).map(x=>this.normalizeRecord(x));
+ records=records.map(r=>{let meta=(source.accountMetadata||{})[r.id]||{},bal=(source.accountBalances||{})[r.id];if(r.type==="account"||r.type==="asset"){r={...r,...meta};if(bal!=null)r.currentBalance=Number(bal)}return r});
+ return {version:3,incomeDB:Array.isArray(source.incomeDB)?source.incomeDB:this.incomeDB,calendarBillsDB:records,structuralFixedDB:Array.isArray(source.structuralFixedDB)?source.structuralFixedDB:this.structuralFixedDB,paymentRegister:Array.isArray(source.paymentRegister)?source.paymentRegister.map(p=>({...p,id:p.id||UUID(),status:p.status||"paid",amount:Number(p.amount||0),principal:Number(p.principal||0),interest:Number(p.interest||0),notes:p.notes||""})):[],accountBalances:source.accountBalances||{},accountMetadata:source.accountMetadata||{},savedAt:source.savedAt||"",paycheckConfig:source.paycheckConfig,paycheckTemplates:source.paycheckTemplates,categorizationRules:source.categorizationRules,transactions:Array.isArray(source.transactions)?source.transactions:undefined}
+},
+saveState(){try{let payload={version:3,savedAt:new Date().toISOString(),incomeDB:this.incomeDB,calendarBillsDB:this.calendarBillsDB,structuralFixedDB:this.structuralFixedDB,paymentRegister:this.paymentRegister,accountBalances:Object.fromEntries(this.accountRecords.map(a=>[a.id,a.currentBalance])),accountMetadata:Object.fromEntries(this.accountRecords.map(a=>[a.id,{accountNumber:a.accountNumber,apr:a.apr,creditLimit:a.creditLimit,minimumPayment:a.minimumPayment,paymentAmount:a.paymentAmount,startingBalance:a.startingBalance,lastPaymentDate:a.lastPaymentDate,lastPaymentAmount:a.lastPaymentAmount}])),paycheckConfig:this.paycheckConfig,paycheckTemplates:this.paycheckTemplates,categorizationRules:this.categorizationRules,transactions:this.transactions};localStorage.setItem(this.persistenceKey,JSON.stringify(payload));this.lastSavedAt=new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}catch(e){console.warn("Budget local save failed:",e)}},
+ loadState(){try{let raw=localStorage.getItem(this.persistenceKey);
+if(!raw){for(let k of LEGACY_KEYS){raw=localStorage.getItem(k);if(raw)break}}
+if(!raw)return;let migrated=this.migratePayload(JSON.parse(raw));this.incomeDB=migrated.incomeDB;this.calendarBillsDB=migrated.calendarBillsDB;this.structuralFixedDB=migrated.structuralFixedDB;this.paymentRegister=migrated.paymentRegister;this.accountBalances=migrated.accountBalances;this.accountMetadata=migrated.accountMetadata;this.paycheckConfig=migrated.paycheckConfig||this.paycheckConfig;this.paycheckTemplates=migrated.paycheckTemplates||this.paycheckTemplates;this.categorizationRules=migrated.categorizationRules||this.categorizationRules;this.transactions=migrated.transactions||this.transactions;this.calendarBillsDB.forEach(a=>{if((a.type==="account"||a.type==="asset")&&this.accountBalances[a.id]!=null)a.currentBalance=Number(this.accountBalances[a.id])});if(migrated.savedAt)this.lastSavedAt=new Date(migrated.savedAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});this.saveState()}catch(e){console.warn("Budget local load failed:",e)}},
+ exportData(){this.saveState();let payload={app:"Interactive Budget Execution Glass Engine",version:3,exportedAt:new Date().toISOString(),incomeDB:this.incomeDB,calendarBillsDB:this.calendarBillsDB,structuralFixedDB:this.structuralFixedDB,paymentRegister:this.paymentRegister,accountBalances:Object.fromEntries(this.accountRecords.map(a=>[a.id,a.currentBalance])),accountMetadata:Object.fromEntries(this.accountRecords.map(a=>[a.id,{accountNumber:a.accountNumber,apr:a.apr,creditLimit:a.creditLimit,minimumPayment:a.minimumPayment,paymentAmount:a.paymentAmount,startingBalance:a.startingBalance,lastPaymentDate:a.lastPaymentDate,lastPaymentAmount:a.lastPaymentAmount}])),paycheckConfig:this.paycheckConfig,paycheckTemplates:this.paycheckTemplates,categorizationRules:this.categorizationRules,transactions:this.transactions};this.download(JSON.stringify(payload,null,2),"budget-backup-"+new Date().toISOString().slice(0,10)+".json","application/json")},
+ download(content,name,type){let blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)},
+ exportPaymentHistory(accountId){let rows=[["Date","Account","Entry Type","Amount","Principal","Interest","Before","After","Status","Notes"]];this.paymentRegister.filter(p=>!accountId||p.accountId===accountId).sort((a,b)=>new Date(a.paymentDate)-new Date(b.paymentDate)).forEach(p=>{let a=this.calendarBillsDB.find(x=>x.id===p.accountId);rows.push([p.paymentDate,a?a.name:"Unknown",p.entryType||"payment",p.amount,p.principal,p.interest,p.balanceBefore,p.balanceAfter,p.status,p.notes||""])});let csv=rows.map(r=>r.map(v=>{let s=String(v??"");return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(",")).join("\n");this.download(csv,"payment-history-"+new Date().toISOString().slice(0,10)+".csv","text/csv;charset=utf-8")},
+ importData(e){let file=e.target.files&&e.target.files[0];if(!file)return;let reader=new FileReader();reader.onload=x=>{try{let imported=JSON.parse(x.target.result),m=this.migratePayload(imported);this.incomeDB=m.incomeDB;this.calendarBillsDB=m.calendarBillsDB;this.structuralFixedDB=m.structuralFixedDB;this.paymentRegister=m.paymentRegister;this.accountBalances=m.accountBalances;this.accountMetadata=m.accountMetadata;this.paycheckConfig=m.paycheckConfig||this.paycheckConfig;this.paycheckTemplates=m.paycheckTemplates||this.paycheckTemplates;this.categorizationRules=m.categorizationRules||this.categorizationRules;this.transactions=Array.isArray(m.transactions)?m.transactions:this.transactions;this.saveState();alert("Budget backup imported successfully.");this.$nextTick(()=>this.renderCharts())}catch(err){alert("Could not import backup: "+err.message)}finally{e.target.value=""}};reader.readAsText(file)},
+ destroyChart(name){if(this.charts[name]){this.charts[name].destroy();this.charts[name]=null}},
+ chartBase(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#f1f5f9",boxWidth:10,font:{size:10}}}},scales:{x:{ticks:{color:"#94a3b8",font:{size:9}},grid:{color:"rgba(255,255,255,.05)"}},y:{ticks:{color:"#94a3b8",font:{size:9}},grid:{color:"rgba(255,255,255,.05)"}}}}},
+ renderCharts(){if(typeof Chart==="undefined")return;this.destroyChart("balance");this.destroyChart("debt");this.destroyChart("trend");let bctx=this.$refs.balanceHistoryChartCanvas,dctx=this.$refs.debtDistChartCanvas,tctx=this.$refs.paymentTrendChartCanvas;if(!bctx||!dctx||!tctx)return;let accounts=this.accountRecords.slice(0,8),labels=[...new Set(this.paymentRegister.map(p=>p.paymentDate).sort())];this.charts.balance=new Chart(bctx,{type:"line",data:{labels:labels.length?labels:["Start"],datasets:accounts.map(a=>{let bal=Number(a.startingBalance||a.currentBalance||0),vals=[];labels.forEach(dt=>{this.paymentRegister.filter(p=>p.accountId===a.id&&p.paymentDate===dt&&p.status!=="reversed").forEach(p=>{bal=Number(p.balanceAfter)});vals.push(bal)});if(!labels.length)vals=[bal];return{label:a.name,data:vals,tension:.25,fill:false}})},options:this.chartBase()});this.charts.debt=new Chart(dctx,{type:"doughnut",data:{labels:this.debtAccounts.map(a=>a.name),datasets:[{data:this.debtAccounts.map(a=>a.currentBalance)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#f1f5f9",font:{size:10}}}}}});let months={};this.paymentRegister.filter(p=>p.status!=="reversed"&&p.entryType!=="charge").forEach(p=>{let k=p.paymentDate.slice(0,7);months[k]=(months[k]||0)+Number(p.amount||0)});let ml=Object.keys(months).sort();this.charts.trend=new Chart(tctx,{type:"bar",data:{labels:ml.length?ml:["No payments"],datasets:[{label:"Payments",data:ml.length?ml.map(k=>months[k]):[0]}]},options:this.chartBase()})},
+ renderAccountChart(){if(typeof Chart==="undefined")return;this.destroyChart("account");let c=this.$refs.accountHistoryChartCanvas,a=this.detailAccount;if(!c||!a||!a.id)return;let events=this.paymentRegister.filter(p=>p.accountId===a.id&&p.status!=="reversed").sort((x,y)=>new Date(x.paymentDate)-new Date(y.paymentDate)),labels=["Starting"],vals=[Number(a.startingBalance||0)];events.forEach(p=>{labels.push(p.paymentDate);vals.push(Number(p.balanceAfter))});this.charts.account=new Chart(c,{type:"line",data:{labels,datasets:[{label:"Balance",data:vals,tension:.25,fill:false}]},options:this.chartBase()})},
+
+ /* PAYCHECK BUDGET ENGINE */
+ cycleRemaining(a){let d=this.scheduledPayment(a),ds=this.getBillDueDates(a).find(x=>x>=this.dayOnly(this.windowDates.startObj)&&x<=this.dayOnly(this.windowDates.endObj));if(!ds)return 0;let key=this.cycleKey(a,ds),p=this.paymentRegister.filter(x=>x.accountId===a.id&&x.cycleKey===key&&x.status!=="reversed"&&x.entryType!=="charge").reduce((n,x)=>n+Number(x.amount||0),0);return money(Math.max(0,d-p))},
+ normalizeCategory(c){let m={"Phone":"AT&T","Internet":"Spectrum","Pharmacy":"Medical","Subscription":"Subscriptions","Emergency Fund":"Savings"};return m[c]||c||""},
+ suggestCategory(){let merchant=(this.txnForm.merchant||"").toLowerCase();if(!merchant)return;for(let k in this.categorizationRules){if(merchant.includes(k.toLowerCase())){this.txnForm.category=this.categorizationRules[k];return}}},
+ openTxnModal(idx){this.activeTxnIdx=idx;this.txnForm=idx===-1?{id:UUID(),date:new Date().toISOString().slice(0,10),merchant:"",category:"",amount:0}:{...this.transactions[idx]}},
+ saveTxn(){let amount=Number(this.txnForm.amount);if(!this.txnForm.merchant||isNaN(amount)||amount<=0){alert("Enter a merchant and a valid amount.");return}if(!this.txnForm.category)this.suggestCategory();let r={...this.txnForm,id:this.txnForm.id||UUID(),amount:money(amount),category:this.txnForm.category||"Uncategorized"};if(this.activeTxnIdx===-1)this.transactions.push(r);else this.$set(this.transactions,this.activeTxnIdx,r);this.activeTxnIdx=null},
+ deleteTxn(){if(this.activeTxnIdx>-1)this.transactions.splice(this.activeTxnIdx,1);this.activeTxnIdx=null},
+ addRule(){let m=(this.ruleForm.merchant||"").trim(),c=(this.ruleForm.category||"").trim();if(!m||!c){alert("Enter both a merchant keyword and a category.");return}this.$set(this.categorizationRules,m,c);this.ruleForm={merchant:"",category:""}},
+ deleteRule(k){this.$delete(this.categorizationRules,k)}
+},
+watch:{incomeDB:{deep:true,handler(){this.saveState()}},calendarBillsDB:{deep:true,handler(){this.saveState();this.$nextTick(()=>this.renderCharts())}},structuralFixedDB:{deep:true,handler(){this.saveState()}},paymentRegister:{deep:true,handler(){this.saveState();this.$nextTick(()=>this.renderCharts())}},viewMode(){this.$nextTick(()=>this.renderCharts())},detailAccountId(){this.$nextTick(()=>this.renderAccountChart())},paycheckConfig:{deep:true,handler(){this.saveState()}},paycheckTemplates:{deep:true,handler(){this.saveState()}},categorizationRules:{deep:true,handler(){this.saveState()}},transactions:{deep:true,handler(){this.saveState()}}},
+mounted(){this.loadState();this.calendarBillsDB=this.calendarBillsDB.map(x=>this.normalizeRecord(x));this.$nextTick(()=>this.renderCharts())}
+});
+});
+</script>
+</body>
+</html>

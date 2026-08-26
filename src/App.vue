@@ -8,6 +8,8 @@ const navItems = [
   { label: 'Accounts', to: '/accounts', icon: '▣' },
   { label: 'Planning', to: '/planning', icon: '⌁' },
   { label: 'Activity', to: '/activity', icon: '↗' },
+  { label: 'Payroll legacy', to: '/legacy/payroll', icon: '◫' },
+  { label: 'Bills legacy', to: '/legacy/bills', icon: '▤' },
 ]
 </script>
 
